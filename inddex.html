@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>澳洲牛排餐廳 - 快速訂餐</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+    .clickable { transition: transform 0.1s; }
+    .clickable:active { transform: scale(0.95); }
+    .menu-table td { padding: 6px 8px; border: 1px solid #e5e7eb; font-size: 14px; }
+    .menu-table th { background: #f3f4f6; font-weight: bold; }
+    .checkbox { width: 18px; height: 18px; }
+    @media print { .no-print { display: none !important; } }
+    .animate-fade-in { animation: fadeIn 0.5s; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen p-4">
+  <div class="max-w-4xl mx-auto bg-white rounded-2xl shadow-xl overflow-hidden">
+    <div class="bg-yellow-100 p-2 text-center text-xs">安全訂餐系統</div>
+    <header class="bg-green-600 text-white p-5 text-center">
+      <h1 class="text-2xl font-bold">澳洲牛排餐廳</h1>
+      <p class="text-sm">快速訂餐 - 需店家確認</p>
+    </header>
+
+    <main class="p-5" id="app">
+      <div class="text-center py-10">
+        <div class="animate-spin inline-block w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full"></div>
+        <p class="mt-2 text-gray-600">載入中...</p>
+      </div>
+    </main>
+
+    <footer class="bg-gray-100 p-3 text-center text-xs border-t">
+      營業時間: 10:00 - 21:00 | LINE: @561zotgq<br>
+      店內最低消費為一份餐點 | 不收服務費，用完餐請回收餐具 | 用餐限九十分鐘請勿飲酒
+    </footer>
+  </div>
+
+  <div id="loading" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+    <div class="bg-white p-6 rounded-lg text-center shadow-xl">
+      <div class="animate-spin inline-block w-8 h-8 border-4 border-green-500 border-t-transparent rounded-full mb-3"></div>
+      <p class="text-gray-700">處理中...</p>
+    </div>
+  </div>
+
+  <script>
+    // 請填入你的「最新」Web App URL（部署後複製）
+    const API_URL = 'https://script.google.com/macros/s/AKfycbyQL4e20Hb1SgIwP0qNh0yIM9Rb34tM3_QddJ-WLnnFvndQ71r6RLprCxl6cQtMKgyh/exec';
+
+    const DELIVERY_FEE = 50;
+    const $ = (s) => document.querySelector(s);
+    let cart = [];
+    let usingFallback = false;
+
+    function showLoading(show) {
+      $('#loading').classList.toggle('hidden', !show);
+    }
+
+    async function call(action, data = {}) {
+      showLoading(true);
+      try {
+        let res;
+        if (action === 'createOrder') {
+          res = await fetch(API_URL, {
+            method: 'POST',
+            redirect: 'follow',
+            body: JSON.stringify({ action, orderData: data })
+          });
+        } else {
+          const url = new URL(API_URL);
+          url.searchParams.set('action', action);
+          Object.keys(data).forEach(k => url.searchParams.set(k, data[k]));
+          res = await fetch(url);
+        }
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const json = await res.json();
+        showLoading(false);
+        usingFallback = false;
+        return json;
+      } catch (e) {
+        console.warn('API 失敗:', e);
+        showLoading(false);
+        usingFallback = true;
+        throw e;
+      }
+    }
+
+    async function loadMenu() {
+      try {
+        const res = await call('getMenu');
+        if (res.success && res.data?.length > 0) {
+          renderMenu(res.data);
+        } else {
+          throw new Error('菜單為空');
+        }
+      } catch (e) {
+        console.error('載入失敗，啟用離線模式');
+        renderMenu(getFallbackMenu());
+      }
+    }
+
+    function getFallbackMenu() {
+      return [
+        {
+          name: '簡餐',
+          items: [
+            { id: 'c1', name: '黃金脆皮雞塊', icon: 'Chicken', basePrice: 299, addonPrice: 150, options: [{ id: 'dessert', choices: [{name:'銅鑼燒冰淇淋'},{name:'花生薄薄冰淇淋'},{name:'蜜糖長棍冰淇淋'},{name:'義式奶酪冰淇淋'},{name:'黑糖剉冰冰淇淋'},{name:'紫米紅豆冰淇淋'}] }] },
+            { id: 'c2', name: '青醬牛肉天使義麵', icon: 'Pasta', basePrice: 299, addonPrice: 150, options: [{ id: 'dessert', choices: [{name:'銅鑼燒冰淇淋'},{name:'花生薄薄冰淇淋'},{name:'蜜糖長棍冰淇淋'},{name:'義式奶酪冰淇淋'},{name:'黑糖剉冰冰淇淋'},{name:'紫米紅豆冰淇淋'}] }] }
+          ]
+        },
+        {
+          name: '牛排餐',
+          items: [
+            { id: 's1', name: '霸王上蓋牛排餐', icon: 'Steak', basePrice: 399, weight: '10oz', friesAddon: 30, dessertAddon: 30, options: [{ id: 'doneness', choices: [{name:'3分熟'},{name:'5分熟'},{name:'7分熟'},{name:'全熟'}] }] },
+            { id: 's2', name: '魔芥板腱牛排餐', icon: 'Steak', basePrice: 399, weight: '10oz', friesAddon: 30, dessertAddon: 30, options: [{ id: 'doneness', choices: [{name:'3分熟'},{name:'5分熟'},{name:'7分熟'},{name:'全熟'}] }] }
+          ]
+        },
+        {
+          name: '半全餐',
+          items: [
+            { id: 'h1', name: '香煎特選板腱半全餐', icon: 'Steak', basePrice: 499, dessertAddon: 30, options: [{ id: 'doneness', choices: [{name:'3分熟'},{name:'5分熟'},{name:'7分熟'},{name:'全熟'}] }] },
+            { id: 'h2', name: '香煎櫻桃鴨胸半全餐', icon: 'Duck', basePrice: 420, dessertAddon: 30 }
+          ]
+        }
+      ];
+    }
+
+    function renderMenu(menu) {
+      const now = new Date(); now.setMinutes(now.getMinutes() + 30);
+      const minDate = now.toISOString().split('T')[0];
+      const minTime = now.toTimeString().slice(0, 5);
+
+      $('#app').innerHTML = `
+        <div class="mb-4 p-3 rounded-lg text-sm text-center ${usingFallback ? 'bg-red-100 border border-red-300' : 'bg-green-50 border border-green-200'}">
+          ${usingFallback ? 'Warning: 離線模式：無法提交訂單' : 'Success: 連線正常'}
+        </div>
+
+        <button onclick="showHistory()" class="w-full p-2 border border-blue-500 text-blue-600 rounded mb-4 clickable">History 歷史訂單</button>
+        
+        <div class="space-y-3 mb-4">
+          <input id="name" placeholder="姓名 *" class="w-full p-3 border rounded-lg" />
+          <input id="phone" placeholder="手機 09xxxxxxxx *" class="w-full p-3 border rounded-lg" />
+          <div class="grid grid-cols-2 gap-2">
+            <input id="date" type="date" value="${minDate}" min="${minDate}" class="p-3 border rounded-lg" />
+            <input id="time" type="time" value="${minTime}" class="p-3 border rounded-lg" />
+          </div>
+          <input id="addr" placeholder="外送地址（選填）" class="w-full p-3 border rounded-lg" />
+          <textarea id="note" placeholder="備註" class="w-full p-3 border rounded-lg" rows="2"></textarea>
+        </div>
+
+        ${menu.map(cat => `
+          <div class="mb-8">
+            <h2 class="text-xl font-bold mb-3 border-b-2 border-green-500 pb-2">${cat.name}</h2>
+            <div class="overflow-x-auto">
+              <table class="menu-table w-full text-sm">
+                <thead>
+                  <tr>
+                    <th class="w-8"></th>
+                    <th>品項</th>
+                    <th>售價</th>
+                    ${cat.name.includes('簡餐') ? '<th>加購</th>' : ''}
+                    ${cat.items.some(i => i.weight) ? '<th>重量</th>' : ''}
+                    ${cat.items.some(i => i.friesAddon) ? '<th>薯條</th>' : ''}
+                    ${cat.items.some(i => i.dessertAddon) ? '<th>甜品</th>' : ''}
+                    <th>數量</th>
+                    ${cat.items.some(i => i.options?.some(o => o.id === 'dessert')) ? `<th colspan="6" class="text-center">甜品</th>` : ''}
+                    ${cat.items.some(i => i.options?.some(o => o.id === 'doneness')) ? `<th colspan="4" class="text-center">熟度</th>` : ''}
+                  </tr>
+                </thead>
+                <tbody>
+                  ${cat.items.map(item => {
+                    const hasDessert = item.options?.some(o => o.id === 'dessert');
+                    const hasDoneness = item.options?.some(o => o.id === 'doneness');
+                    return `<tr data-id="${item.id}">
+                      <td><input type="checkbox" class="checkbox" onchange="toggleItem('${item.id}', this.checked)"></td>
+                      <td>${item.icon || ''} ${item.name}</td>
+                      <td class="text-green-600 font-bold">$${item.basePrice}</td>
+                      ${cat.name.includes('簡餐') ? `<td>${item.addonPrice > 0 ? '+$'+item.addonPrice : ''}</td>` : ''}
+                      ${item.weight ? `<td>${item.weight}</td>` : '<td></td>'}
+                      ${item.friesAddon ? `<td>+$${item.friesAddon}</td>` : '<td></td>'}
+                      ${item.dessertAddon ? `<td>+$${item.dessertAddon}</td>` : '<td></td>'}
+                      <td>
+                        <div class="flex justify-center gap-1">
+                          <button onclick="changeQty('${item.id}', -1)" class="w-6 h-6 bg-red-500 text-white rounded text-xs clickable">-</button>
+                          <span id="qty-${item.id}" class="w-6 text-center font-bold">0</span>
+                          <button onclick="changeQty('${item.id}', 1)" class="w-6 h-6 bg-green-500 text-white rounded text-xs clickable">+</button>
+                        </div>
+                      </td>
+                      ${hasDessert ? item.options.find(o=>o.id==='dessert').choices.map((c,i)=>`<td><input type="radio" name="dessert-${item.id}" value="${c.name}" ${i===0?'checked':''}></td>`).join('') : '<td colspan="6"></td>'}
+                      ${hasDoneness ? item.options.find(o=>o.id==='doneness').choices.map((c,i)=>`<td><input type="radio" name="doneness-${item.id}" value="${c.name}" ${i===2?'checked':''}></td>`).join('') : '<td colspan="4"></td>'}
+                    </tr>`;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        `).join('')}
+
+        <div id="cart" class="bg-yellow-50 p-4 rounded-lg border mb-4 hidden">
+          <div class="flex justify-between mb-2"><h3 class="font-bold">訂單</h3><button onclick="clearCart()" class="text-xs text-red-600">清空</button></div>
+          <div id="cart-items"></div>
+          <div id="fee" class="flex justify-between text-sm hidden">外送費 <span>$${DELIVERY_FEE}</span></div>
+          <div class="border-t pt-2 font-bold flex justify-between">總計 <span id="total" class="text-green-600">$0</span></div>
+        </div>
+
+        <button onclick="submitOrder()" class="w-full bg-green-600 text-white py-3 rounded-lg font-bold ${usingFallback ? 'opacity-50' : ''}" ${usingFallback?'disabled':''}>
+          ${usingFallback ? '離線模式' : '送出訂單'}
+        </button>
+      `;
+
+      $('#addr').addEventListener('input', updateCart);
+    }
+
+    window.changeQty = (id, d) => {
+      const s = $(`#qty-${id}`); let q = +s.textContent + d; q = Math.max(0, q); s.textContent = q;
+      $(`tr[data-id="${id}"] input[type="checkbox"]`).checked = q > 0;
+      updateCart();
+    };
+    window.toggleItem = (id, c) => { if (!c) $(`#qty-${id}`).textContent = '0'; updateCart(); };
+    function clearCart() { if (confirm('清空？')) { document.querySelectorAll('tr[data-id]').forEach(r => { r.querySelector('input[type="checkbox"]').checked = false; r.querySelector('[id^="qty-"]').textContent = '0'; }); updateCart(); } }
+
+    function updateCart() {
+      cart = [];
+      document.querySelectorAll('tr[data-id]').forEach(row => {
+        if (!row.querySelector('input[type="checkbox"]').checked) return;
+        const qty = +row.querySelector('[id^="qty-"]').textContent || 0;
+        if (qty === 0) return;
+        const name = row.cells[1].textContent.trim();
+        const price = +row.cells[2].textContent.replace('$','') || 0;
+        const item = { name, price, quantity: qty };
+        const d = row.querySelector('input[name^="dessert-"]:checked'); if (d) item.dessert = d.value;
+        const o = row.querySelector('input[name^="doneness-"]:checked'); if (o) item.doneness = o.value;
+        cart.push(item);
+      });
+      const has = cart.length > 0;
+      $('#cart').classList.toggle('hidden', !has);
+      if (!has) return;
+      $('#cart-items').innerHTML = cart.map(c => `<div class="flex justify-between text-sm"><span>${c.name} x${c.quantity}${c.dessert?' ('+c.dessert+')':''}${c.doneness?' ('+c.doneness+')':''}</span><span>$${c.price*c.quantity}</span></div>`).join('');
+      const addr = $('#addr').value.trim();
+      $('#fee').classList.toggle('hidden', !addr);
+      $('#total').textContent = '$' + (cart.reduce((s,i)=>s+i.price*i.quantity,0) + (addr?DELIVERY_FEE:0));
+    }
+
+    window.submitOrder = async () => {
+      if (usingFallback) return alert('離線模式，無法提交');
+      const name = $('#name').value.trim(), phone = $('#phone').value, date = $('#date').value, time = $('#time').value, addr = $('#addr').value.trim(), note = $('#note').value.trim();
+      if (!name || !/^09\d{8}$/.test(phone) || !date || !time || !cart.length) return alert('請填完整');
+      try {
+        const res = await call('createOrder', { customerName: name, customerPhone: phone, items: cart, pickupTime: `${date}T${time}:00`, deliveryAddress: addr, notes: note });
+        if (res.success) showSuccess(res.data, name, phone, `${date} ${time}`, addr, note, cart);
+        else alert(res.message || '失敗');
+      } catch { alert('網路錯誤'); }
+    };
+
+    function showSuccess(order, name, phone, time, addr, note, items) {
+      const text = `【訂單】\n編號: ${order.orderId}\n姓名: ${name}\n電話: ${phone}\n總額: $${order.totalAmount}\n取餐: ${time}\n${addr?'外送: '+addr:'自取'}\n請店家回覆「確認」`;
+      $('#app').innerHTML = `<div class="text-center"><div class="text-6xl mb-4">Success</div><h3 class="text-2xl font-bold text-green-600 mb-4">訂單提交成功！</h3>
+        <div class="bg-gray-50 p-4 rounded text-left text-sm mb-6"><p><strong>編號:</strong> ${order.orderId}</p><p><strong>總額:</strong> $${order.totalAmount}</p></div>
+        <a href="https://line.me/R/msg/text/?${encodeURIComponent(text)}" target="_blank" class="block w-full bg-green-500 text-white py-3 rounded mb-3 no-print">LINE 分享</a>
+        <button onclick="window.print()" class="block w-full bg-blue-500 text-white py-3 rounded mb-3 no-print">列印</button>
+        <button onclick="location.reload()" class="w-full bg-gray-600 text-white py-3 rounded no-print">再訂一單</button>
+      </div>`;
+    }
+
+    window.showHistory = async () => {
+      const name = prompt('姓名'), phone = prompt('手機'); if (!name || !phone || !/^09\d{8}$/.test(phone)) return;
+      try {
+        const res = await call('getOrders', { customerName: name, customerPhone: phone });
+        if (res.success && res.data?.length) {
+          $('#app').innerHTML = `<button onclick="loadMenu()" class="mb-4 text-blue-600">返回</button>${res.data.map(o=>`<div class="bg-white p-4 rounded border mb-3"><p><strong>${o.orderId}</strong> - ${new Date(o.createdAt).toLocaleString('zh-TW')}</p><p>$${o.totalAmount} | ${o.status}</p></div>`).join('')}`;
+        } else alert('無紀錄');
+      } catch { alert('查詢失敗'); }
+    };
+
+    loadMenu();
+  </script>
+</body>
+</html>
