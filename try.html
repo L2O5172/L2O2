@@ -1,284 +1,912 @@
 <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <title>美味廚房點餐系統</title>
-  <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  <style>
-    body { font-family: 'Noto Sans TC', sans-serif; -webkit-tap-highlight-color: transparent; }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>美味廚房點餐系統</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<script type="importmap">
+{
+  "imports": {
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "react": "https://esm.sh/react@18.2.0",
+    "react/": "https://aistudiocdn.com/react@^19.2.0/",
+    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
+  }
+}
+</script>
 </head>
 <body class="bg-slate-100">
-  <div id="root"></div>
+    <div id="root"></div>
+    <script type="text/babel" data-type="module">
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+import ReactDOM from 'react-dom/client';
 
-  <!-- 移除 importmap，改用 CDN 完整導入 React -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+// --- types.ts ---
+interface MenuItem {
+  id: string;
+  name:string;
+  price: number;
+  weight?: string;
+  customizations?: {
+    doneness?: boolean;
+    sauceChoice?: boolean;
+    drinkChoice?: boolean;
+    notes?: boolean;
+  };
+}
 
-  <script type="text/babel">
-    const { useState, useEffect, useMemo, useCallback } = React;
+interface MenuCategory {
+  title: string;
+  description: string;
+  items: MenuItem[];
+}
 
-    // === 所有常量放在最上面，避免作用域問題 ===
-    const Doneness = {
-      Three: '3分熟',
-      Five: '5分熟',
-      Seven: '7分熟',
-      WellDone: '全熟'
-    };
+interface Addon {
+  id: string;
+  name: string;
+  price: number;
+  category: string;
+}
 
-    const DONENESS_LEVELS = [Doneness.Three, Doneness.Five, Doneness.Seven, Doneness.WellDone];
-    const SAUCE_CHOICES = ["巴醋", "橙汁", "椒鹽", "芥末", "泡菜", "BBQ醬", "黑胡椒", "蒜味醬"];
-    const DRINK_CHOICES = ["無糖紅茶", "冰涼可樂"];
+interface CartItem {
+  cartId: string;
+  item: MenuItem;
+  quantity: number;
+  selectedDonenesses?: { [key: string]: number };
+  selectedDrinks?: { [key: string]: number };
+  selectedSauces: { name: string; quantity: number }[];
+  selectedAddons: { id: string; name: string; price: number, quantity: number }[];
+  selectedNotes: string;
+  totalPrice: number;
+}
 
-    const FALLBACK_MENU = [ /* ... 你的 MENU_DATA 複製進來 ... */ ];
-    const FALLBACK_ADDONS = [ /* ... 你的 ADDONS 複製進來 ... */ ];
+// --- constants.ts ---
+enum Doneness {
+  Three = '3分熟',
+  Five = '5分熟',
+  Seven = '7分熟',
+  WellDone = '全熟',
+}
 
-    const API_URL = 'https://script.google.com/macros/s/AKfycbysLyXmbsHSQ-nT7oN8lh2gPQPlNNLqM1EbCbAtmGdzq2U8OY5OGFQxLjqbD2W7KpEF/exec';
+const MENU_DATA: MenuCategory[] = [
+  {
+    title: "套餐",
+    description: "附: ①日湯 ②麵包 ③主餐 ④薯條 ⑤飲料",
+    items: [
+      { id: 'set-1', name: '香煎海盜牛排套餐', weight: '7oz', price: 299, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'set-2', name: '香煎海盜牛排套餐', weight: '14oz', price: 399, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'set-3', name: '香煎海盜牛排套餐', weight: '21oz', price: 499, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'set-4', name: '香煎特選板腱套餐', weight: '10oz', price: 399, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'set-5', name: '香煎老饕上蓋套餐', weight: '7oz', price: 399, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'set-6', name: '香煎紐菲力半套餐', weight: '7oz', price: 499, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'set-7', name: '香煎櫻桃鴨胸半全餐', weight: '10oz', price: 320, customizations: { sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'set-8', name: '香煎鮮嫩鱸魚半全餐', weight: '10oz', price: 320, customizations: { sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'set-9', name: '香煎鮮嫩雞腿半全餐', weight: '10oz', price: 250, customizations: { sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'set-10', name: '香煎美味豬排半全餐', weight: '10oz', price: 299, customizations: { sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'set-11', name: '英式炸魚半全餐', weight: '10oz', price: 250, customizations: { sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'set-12', name: '日式豬排半全餐', weight: '10oz', price: 250, customizations: { sauceChoice: true, drinkChoice: true, notes: true } },
+    ]
+  },
+  {
+    title: "組合餐",
+    description: "附: ①日湯 ②麵包 ③主餐 ④薯條 ⑤沙拉 ⑥飲料",
+    items: [
+      { id: 'combo-1', name: '日豬、雞腿、上蓋組合餐', weight: '15oz', price: 529, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'combo-2', name: '炸魚、雞腿、板腱組合餐', weight: '15oz', price: 529, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'combo-3', name: '鱸魚、鴨胸、豬排組合餐', weight: '15oz', price: 529, customizations: { sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'combo-4', name: '鴨胸、鱸魚、上蓋組合餐', weight: '15oz', price: 599, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true } },
+      { id: 'combo-5', name: 'N菲、上蓋、板腱組合餐', weight: '15oz', price: 699, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true } },
+    ]
+  }
+];
 
-    // === Icons ===
-    const PlusIcon = ({ className = "h-5 w-5" }) => (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-      </svg>
-    );
+const ADDONS: Addon[] = [
+    { id: 'addon-pirate-steak', name: '海盜牛排 5oz', price: 200, category: '主餐加購' },
+    { id: 'addon-flank-steak', name: '板腱牛排 5oz', price: 200, category: '主餐加購' },
+    { id: 'addon-ribeye-cap-steak', name: '老饕上蓋 5oz', price: 200, category: '主餐加購' },
+    { id: 'addon-filet-mignon', name: '紐菲力 5oz', price: 250, category: '主餐加購' },
+    { id: 'addon-duck-breast', name: '櫻桃鴨胸', price: 150, category: '主餐加購' },
+    { id: 'addon-sea-bass', name: '鮮嫩鱸魚', price: 150, category: '主餐加購' },
+    { id: 'addon-chicken-leg', name: '鮮嫩雞腿', price: 120, category: '主餐加購' },
+    { id: 'addon-pork-chop', name: '美味豬排', price: 120, category: '主餐加購' },
+    { id: 'addon-fried-fish', name: '英式炸魚', price: 120, category: '主餐加購' },
+    { id: 'addon-jp-pork-cutlet', name: '日式豬排', price: 120, category: '主餐加購' },
+    { id: 'addon-dessert', name: '甜品', price: 30, category: '其他加購' },
+    { id: 'addon-bread', name: '蒜味麵包', price: 60, category: '其他加購' },
+    { id: 'addon-fries', name: '黃金脆薯', price: 60, category: '其他加購' },
+    { id: 'addon-nuggets', name: '脆皮雞塊', price: 75, category: '其他加購' },
+    { id: 'addon-icecream', name: '香草冰淇淋', price: 60, category: '其他加購' },
+];
 
-    const MinusIcon = ({ className = "h-5 w-5" }) => (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
-      </svg>
-    );
+const DONENESS_LEVELS = [Doneness.Three, Doneness.Five, Doneness.Seven, Doneness.WellDone];
+const SAUCE_CHOICES = ["巴醋", "橙汁", "椒鹽", "芥末", "泡菜", "BBQ醬", "黑胡椒", "蒜味醬"];
+const DRINK_CHOICES = ["無糖紅茶", "冰涼可樂"];
 
-    const TrashIcon = ({ className = "h-5 w-5" }) => (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-      </svg>
-    );
+// --- components/icons.tsx ---
+type IconProps = {
+  className?: string;
+};
 
-    const CloseIcon = ({ className = "h-6 w-6" }) => (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-      </svg>
-    );
+const PlusIcon: React.FC<IconProps> = ({ className = "h-5 w-5" }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+  </svg>
+);
 
-    const CartIcon = ({ className = "h-6 w-6" }) => (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m-6 4a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
-      </svg>
-    );
+const MinusIcon: React.FC<IconProps> = ({ className = "h-5 w-5" }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
+  </svg>
+);
 
-    const CheckIcon = ({ className = "h-6 w-6" }) => (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-      </svg>
-    );
+const TrashIcon: React.FC<IconProps> = ({ className = "h-5 w-5" }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+  </svg>
+);
 
-    const RefreshIcon = ({ className = "h-5 w-5" }) => (
-      <svg className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-      </svg>
-    );
+const CloseIcon: React.FC<IconProps> = ({ className = "h-6 w-6" }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+  </svg>
+);
 
-    // === API Service ===
-    const apiService = {
-      async getMenuAndAddons() {
-        try {
-          const res = await fetch(`${API_URL}?action=getMenu`);
-          if (!res.ok) throw new Error('Network error');
-          const data = await res.json();
-          if (!data.menu || !data.addons) throw new Error('Invalid data');
-          return { ...data, from: 'api' };
-        } catch (e) {
-          console.warn('API failed, using fallback', e);
-          return { menu: FALLBACK_MENU, addons: FALLBACK_ADDONS, from: 'fallback' };
-        }
-      },
+const CartIcon: React.FC<IconProps> = ({ className = "h-6 w-6" }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m-6 4a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+  </svg>
+);
 
-      async submitOrder(orderData) {
-        const simplifiedItems = orderData.items.map(item => ({
-          name: `${item.item.name}${item.item.weight ? ` (${item.item.weight})` : ''}`,
-          quantity: item.quantity,
-          totalPrice: item.totalPrice,
-          customizations: {
-            doneness: item.selectedDonenesses ? Object.entries(item.selectedDonenesses).map(([d, q]) => `${d} x${q}`).join(', ') : 'N/A',
-            drinks: item.selectedDrinks ? Object.entries(item.selectedDrinks).map(([d, q]) => `${d} x${q}`).join(', ') : 'N/A',
-            sauces: item.selectedSauces.map(s => `${s.name}${s.quantity > 1 ? ` x${s.quantity}` : ''}`).join(', ') || 'None',
-            addons: item.selectedAddons.map(a => `${a.name} x${a.quantity}`).join(', ') || 'None',
-            notes: item.selectedNotes || 'None',
-          }
+const CheckIcon: React.FC<IconProps> = ({ className = "h-6 w-6" }) => (
+  <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+  </svg>
+);
+
+const RefreshIcon: React.FC<IconProps> = ({ className = "h-5 w-5" }) => (
+    <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+      <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+    </svg>
+);
+
+// --- apiService.ts ---
+const API_URL = 'https://script.google.com/macros/s/AKfycbxy5apEAGz1m4X-iljhp_8kUS9Dmq2HhwCLo-bvtn9XtMnaNBbyZhLzaz6mwSlSAClp/exec';
+
+type ApiResponse = {
+  menu: MenuCategory[];
+  addons: Addon[];
+};
+
+const apiService = {
+  async getMenuAndAddons(): Promise<{ menu: MenuCategory[]; addons: Addon[]; from: 'api' | 'fallback' }> {
+    try {
+      const response = await fetch(`${API_URL}?action=getMenu`);
+      if (!response.ok) {
+        throw new Error('Network response was not ok');
+      }
+      const data: ApiResponse = await response.json();
+      if (!data.menu || !data.addons) {
+        throw new Error('Invalid data structure from API');
+      }
+      return { ...data, from: 'api' };
+    } catch (error) {
+      console.warn("API fetch failed, using fallback.", error);
+      return { menu: MENU_DATA, addons: ADDONS, from: 'fallback' };
+    }
+  },
+
+  async submitOrder(orderData: { items: CartItem[], totalPrice: number, customerInfo: any }): Promise<any> {
+    try {
+        const simplifiedItems = orderData.items.map((cartItem: CartItem) => ({
+            name: `${cartItem.item.name}${cartItem.item.weight ? ` (${cartItem.item.weight})` : ''}`,
+            quantity: cartItem.quantity,
+            totalPrice: cartItem.totalPrice,
+            customizations: {
+                doneness: cartItem.selectedDonenesses ? Object.entries(cartItem.selectedDonenesses).map(([d, q]) => `${d} x${q}`).join(', ') : 'N/A',
+                drinks: cartItem.selectedDrinks ? Object.entries(cartItem.selectedDrinks).map(([d, q]) => `${d} x${q}`).join(', ') : 'N/A',
+                sauces: cartItem.selectedSauces.map(s => `${s.name}${s.quantity > 1 ? ` x${s.quantity}` : ''}`).join(', ') || 'None',
+                addons: cartItem.selectedAddons.map(a => `${a.name} x${a.quantity}`).join(', ') || 'None',
+                notes: cartItem.selectedNotes || 'None',
+            }
         }));
 
         const payload = {
-          action: 'createOrder',
-          orderData: {
-            customerName: orderData.customerInfo.name,
-            customerPhone: orderData.customerInfo.phone,
-            tableNumber: orderData.customerInfo.tableNumber,
-            items: JSON.stringify(simplifiedItems, null, 2),
-            totalAmount: orderData.totalPrice,
-            timestamp: new Date().toISOString(),
-          },
+            action: 'createOrder',
+            orderData: {
+                customerName: orderData.customerInfo.name,
+                customerPhone: orderData.customerInfo.phone,
+                tableNumber: orderData.customerInfo.tableNumber,
+                items: JSON.stringify(simplifiedItems, null, 2),
+                totalAmount: orderData.totalPrice,
+                timestamp: new Date().toISOString(),
+            },
         };
-
-        const res = await fetch(API_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+        
+        const response = await fetch(API_URL, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'text/plain;charset=utf-8',
+            },
+            body: JSON.stringify(payload),
         });
 
-        if (!res.ok) {
-          const txt = await res.text();
-          throw new Error(`Server error: ${res.status} ${txt}`);
+        if (!response.ok) {
+            const errorText = await response.text();
+            throw new Error(`Server error: ${response.status} ${response.statusText}. Response: ${errorText}`);
+        }
+        
+        const responseText = await response.text();
+        try {
+            const result = JSON.parse(responseText);
+            if (!result.success) {
+                throw new Error(result.message || 'The server indicated an unknown error.');
+            }
+            return result;
+        } catch (e) {
+            throw new Error(`Received an invalid response from the server: ${responseText}`);
         }
 
-        const result = await res.json();
-        if (!result.success) throw new Error(result.message || 'Unknown error');
-        return result;
-      }
-    };
+    } catch (error) {
+        console.error("Failed to submit order:", error);
+        if (error instanceof Error) {
+            throw error;
+        }
+        throw new Error('An unknown error occurred during order submission.');
+    }
+  }
+};
 
-    // === Components ===
-    const Menu = ({ menuData, onSelectItem }) => (
-      <div className="space-y-12">
-        {menuData.map(cat => (
-          <div key={cat.title}>
-            <div className="mb-6 pb-2 border-b-2 border-green-700">
-              <h2 className="text-3xl font-bold text-slate-800">{cat.title}</h2>
-              <p className="text-sm text-slate-500 mt-1">{cat.description}</p>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-              {cat.items.map(item => (
-                <div key={item.id} className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col hover:scale-105 transition-transform">
-                  <div className="p-6 flex-grow flex flex-col justify-between">
-                    <div>
-                      <h3 className="text-xl font-semibold text-slate-900">{item.name}</h3>
-                      {item.weight && <p className="text-sm text-slate-500">{item.weight}</p>}
-                      <p className="text-2xl font-bold text-green-700 mt-2">${item.price}</p>
-                      {item.customizations && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {item.customizations.doneness && <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">可選熟度</span>}
-                          {item.customizations.sauceChoice && <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">可選醬料</span>}
-                          {item.customizations.drinkChoice && <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">可選附餐</span>}
-                        </div>
-                      )}
-                    </div>
-                    <button onClick={() => onSelectItem(item)} className="mt-4 w-full flex items-center justify-center bg-green-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-700">
-                      <PlusIcon className="h-5 w-5 mr-2" /> 加入餐點
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
+// --- components/Menu.tsx ---
+type MenuProps = {
+  menuData: MenuCategory[];
+  onSelectItem: (item: MenuItem) => void;
+};
+
+const Menu: React.FC<MenuProps> = ({ menuData, onSelectItem }) => {
+  return (
+    <div className="space-y-12">
+      {menuData.map((category) => (
+        <div key={category.title} id={category.title}>
+          <div className="mb-6 pb-2 border-b-2 border-green-700">
+            <h2 className="text-3xl font-bold text-slate-800">{category.title}</h2>
+            <p className="text-sm text-slate-500 mt-1">{category.description}</p>
           </div>
-        ))}
-      </div>
-    );
-
-    const ItemModal = ({ item, addons, onClose, onAddToCart }) => {
-      const [quantity, setQuantity] = useState(1);
-      const isSteak = !!item.customizations?.doneness;
-      const [donenessQuantities, setDonenessQuantities] = useState({});
-      const [drinkQuantities, setDrinkQuantities] = useState({});
-      const [notes, setNotes] = useState('');
-      const [selectedAddons, setSelectedAddons] = useState([]);
-      const [selectedSauces, setSelectedSauces] = useState([]);
-
-      const allocatedDonenessCount = useMemo(() => Object.values(donenessQuantities).reduce((a, b) => a + b, 0), [donenessQuantities]);
-      const allocatedDrinkCount = useMemo(() => Object.values(drinkQuantities).reduce((a, b) => a + b, 0), [drinkQuantities]);
-      const totalSauceCount = useMemo(() => selectedSauces.reduce((a, s) => a + s.quantity, 0), [selectedSauces]);
-      const totalSauceLimit = quantity * 2;
-
-      const addonGroups = useMemo(() => addons.reduce((acc, a) => {
-        (acc[a.category] = acc[a.category] || []).push(a);
-        return acc;
-      }, {}), [addons]);
-
-      const handleDonenessChange = useCallback((d, change) => {
-        setDonenessQuantities(prev => {
-          const cur = prev[d] || 0;
-          const next = cur + change;
-          if (next < 0 || (change > 0 && allocatedDonenessCount >= quantity)) return prev;
-          const newObj = { ...prev };
-          if (next === 0) delete newObj[d]; else newObj[d] = next;
-          return newObj;
-        });
-      }, [allocatedDonenessCount, quantity]);
-
-      const handleDrinkChange = useCallback((d, change) => {
-        setDrinkQuantities(prev => {
-          const cur = prev[d] || 0;
-          const next = cur + change;
-          if (next < 0 || (change > 0 && allocatedDrinkCount >= quantity)) return prev;
-          const newObj = { ...prev };
-          if (next === 0) delete newObj[d]; else newObj[d] = next;
-          return newObj;
-        });
-      }, [allocatedDrinkCount, quantity]);
-
-      const handleAddonChange = useCallback((addon, change) => {
-        setSelectedAddons(prev => {
-          const existing = prev.find(a => a.id === addon.id);
-          if (existing) {
-            const newQ = existing.quantity + change;
-            return newQ <= 0 ? prev.filter(a => a.id !== addon.id) : prev.map(a => a.id === addon.id ? { ...a, quantity: newQ } : a);
-          }
-          return change > 0 ? [...prev, { ...addon, quantity: change }] : prev;
-        });
-      }, []);
-
-      const handleSauceChange = useCallback((name, change) => {
-        setSelectedSauces(prev => {
-          const existing = prev.find(s => s.name === name);
-          if (existing) {
-            const newQ = existing.quantity + change;
-            if (newQ < 0 || (change > 0 && totalSauceCount >= totalSauceLimit)) return prev;
-            return newQ === 0 ? prev.filter(s => s.name !== name) : prev.map(s => s.name === name ? { ...s, quantity: newQ } : s);
-          }
-          return change > 0 && totalSauceCount < totalSauceLimit ? [...prev, { name, quantity: 1 }] : prev;
-        });
-      }, [totalSauceCount, totalSauceLimit]);
-
-      const handleSubmit = () => {
-        if (isSteak && allocatedDonenessCount !== quantity) { alert(`請分配所有 ${quantity} 份餐點的熟度`); return; }
-        if (item.customizations?.drinkChoice && allocatedDrinkCount !== quantity) { alert(`請選擇所有 ${quantity} 份餐點的飲料`); return; }
-        onAddToCart(item, quantity, { donenesses: donenessQuantities, drinks: drinkQuantities, addons: selectedAddons, sauces: selectedSauces, notes: notes.trim() });
-        onClose();
-      };
-
-      const totalAddonPrice = selectedAddons.reduce((s, a) => s + a.price * a.quantity, 0);
-      const totalPrice = item.price * quantity + totalAddonPrice;
-
-      return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
-          <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
-            <header className="p-6 relative border-b">
-              <button onClick={onClose} className="absolute top-4 right-4"><CloseIcon /></button>
-              <h2 className="text-2xl font-bold">{item.name}{item.weight && ` (${item.weight})`}</h2>
-              <p className="text-xl font-semibold text-green-700 mt-2">${item.price}</p>
-            </header>
-            <main className="px-6 py-4 space-y-6 overflow-y-auto">
-              {/* 數量、熟度、飲料、醬料、加購、備註... 略，保持不變 */}
-              {/* 請將原本 ItemModal 的 JSX 內容貼在這裡 */}
-            </main>
-            <footer className="p-6 border-t bg-slate-50">
-              <button onClick={handleSubmit} className="w-full bg-green-600 text-white font-bold py-4 rounded-lg hover:bg-green-700 text-lg">
-                加入購物車 - 總計 ${totalPrice}
-              </button>
-            </footer>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {category.items.map((item) => (
+              <div key={item.id} className="bg-white rounded-lg shadow-lg overflow-hidden flex flex-col transition-transform transform hover:scale-105">
+                <div className="p-6 flex-grow flex flex-col justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold text-slate-900">{item.name}</h3>
+                    {item.weight && <p className="text-sm text-slate-500">{item.weight}</p>}
+                    <p className="text-2xl font-bold text-green-700 mt-2">${item.price}</p>
+                    {item.customizations && (
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {item.customizations.doneness && <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">可選熟度</span>}
+                        {item.customizations.sauceChoice && <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">可選醬料</span>}
+                        {item.customizations.drinkChoice && <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">可選附餐</span>}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => onSelectItem(item)}
+                    className="mt-4 w-full flex items-center justify-center bg-green-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-colors"
+                  >
+                    <PlusIcon className="h-5 w-5 mr-2" />
+                    <span>加入餐點</span>
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-      );
+      ))}
+    </div>
+  );
+};
+
+// --- components/ItemModal.tsx ---
+type ItemModalProps = {
+  item: MenuItem;
+  addons: Addon[];
+  onClose: () => void;
+  onAddToCart: (item: MenuItem, quantity: number, options: any) => void;
+};
+
+const ItemModal: React.FC<ItemModalProps> = ({ item, addons, onClose, onAddToCart }) => {
+  const [quantity, setQuantity] = useState(1);
+  const isSteak = !!item.customizations?.doneness;
+
+  const [donenessQuantities, setDonenessQuantities] = useState<{ [key: string]: number }>({});
+  const [drinkQuantities, setDrinkQuantities] = useState<{ [key: string]: number }>({});
+  const [notes, setNotes] = useState('');
+  const [selectedAddons, setSelectedAddons] = useState<{id: string, name: string, price: number, quantity: number}[]>([]);
+  const [selectedSauces, setSelectedSauces] = useState<{ name: string; quantity: number }[]>([]);
+
+  // Memoized calculations for validation and totals
+  const allocatedDonenessCount = useMemo(() => Object.values(donenessQuantities).reduce((sum: number, count: number) => sum + count, 0), [donenessQuantities]);
+  const allocatedDrinkCount = useMemo(() => Object.values(drinkQuantities).reduce((sum: number, count: number) => sum + count, 0), [drinkQuantities]);
+  const totalSauceCount = useMemo(() => selectedSauces.reduce((sum, sauce) => sum + sauce.quantity, 0), [selectedSauces]);
+  const totalSauceLimit = quantity * 2;
+
+  const addonGroups = useMemo(() => {
+    // By typing the accumulator `acc` of the reduce function, we ensure that the result
+    // is correctly typed as `Record<string, Addon[]>`. This prevents a downstream error
+    // where `addonList` would be inferred as `unknown`, causing a crash on `.map()`.
+    return addons.reduce((acc: Record<string, Addon[]>, addon) => {
+      (acc[addon.category] = acc[addon.category] || []).push(addon);
+      return acc;
+    }, {});
+  }, [addons]);
+
+  // Handlers for customization changes
+  const handleDonenessChange = useCallback((doneness: Doneness, change: number) => {
+    setDonenessQuantities(prev => {
+        const newQuantities = { ...prev };
+        const currentCount = newQuantities[doneness] || 0;
+        const newCount = currentCount + change;
+        
+        if (newCount < 0) return prev;
+        if (change > 0 && allocatedDonenessCount >= quantity) return prev;
+
+        if (newCount === 0) {
+            delete newQuantities[doneness];
+        } else {
+            newQuantities[doneness] = newCount;
+        }
+        return newQuantities;
+    });
+  }, [allocatedDonenessCount, quantity]);
+
+  const handleDrinkChange = useCallback((drink: string, change: number) => {
+    setDrinkQuantities(prev => {
+        const newQuantities = { ...prev };
+        const currentCount = newQuantities[drink] || 0;
+        const newCount = currentCount + change;
+        
+        if (newCount < 0) return prev;
+        if (change > 0 && allocatedDrinkCount >= quantity) return prev;
+        
+        if (newCount === 0) {
+            delete newQuantities[drink];
+        } else {
+            newQuantities[drink] = newCount;
+        }
+        return newQuantities;
+    });
+  }, [allocatedDrinkCount, quantity]);
+
+  const handleAddonQuantityChange = useCallback((addon: Addon, change: number) => {
+    setSelectedAddons(prev => {
+      const existingAddon = prev.find(a => a.id === addon.id);
+      if (existingAddon) {
+        const newQuantity = existingAddon.quantity + change;
+        return newQuantity <= 0 ? prev.filter(a => a.id !== addon.id) : prev.map(a => a.id === addon.id ? { ...a, quantity: newQuantity } : a);
+      } else if (change > 0) {
+        return [...prev, { ...addon, quantity: change }];
+      }
+      return prev;
+    });
+  }, []);
+
+  const handleSauceChange = useCallback((sauceName: string, change: number) => {
+    setSelectedSauces(prev => {
+      const existingSauce = prev.find(s => s.name === sauceName);
+      if (existingSauce) {
+        const newQuantity = existingSauce.quantity + change;
+        if (newQuantity < 0) return prev;
+        if (totalSauceCount >= totalSauceLimit && change > 0) return prev;
+        if (newQuantity === 0) return prev.filter(s => s.name !== sauceName);
+        return prev.map(s => s.name === sauceName ? { ...s, quantity: newQuantity } : s);
+      } else if (change > 0 && totalSauceCount < totalSauceLimit) {
+        return [...prev, { name: sauceName, quantity: 1 }];
+      }
+      return prev;
+    });
+  }, [totalSauceCount, totalSauceLimit]);
+
+  // Submission logic
+  const handleSubmit = () => {
+    if (isSteak && allocatedDonenessCount !== quantity) { alert(`請分配所有 ${quantity} 份餐點的熟度`); return; }
+    if (item.customizations?.drinkChoice && allocatedDrinkCount !== quantity) { alert(`請選擇所有 ${quantity} 份餐點的飲料`); return; }
+
+    const options = { 
+        donenesses: donenessQuantities,
+        drinks: drinkQuantities,
+        addons: selectedAddons, 
+        sauces: selectedSauces, 
+        notes: notes.trim() 
+    };
+    onAddToCart(item, quantity, options);
+    onClose();
+  };
+  
+  const totalAddonPrice = selectedAddons.reduce((sum, addon) => sum + (addon.price * addon.quantity), 0);
+  const totalPrice = (item.price * quantity) + totalAddonPrice;
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <header className="p-6 relative border-b">
+          <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-800"><CloseIcon /></button>
+          <h2 className="text-2xl font-bold text-slate-800">{item.name}{item.weight && ` (${item.weight})`}</h2>
+          <p className="text-xl font-semibold text-green-700 mt-2">${item.price}</p>
+        </header>
+
+        <main className="px-6 py-4 space-y-6 overflow-y-auto">
+          <div className="flex items-center justify-between">
+            <h3 className="text-lg font-semibold text-slate-700">數量</h3>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon /></button>
+              <span className="text-xl font-bold w-12 text-center">{quantity}</span>
+              <button onClick={() => setQuantity(q => q + 1)} className="p-2 rounded-full bg-slate-200 hover:bg-slate-300"><PlusIcon /></button>
+            </div>
+          </div>
+          
+          {isSteak && (
+            <div>
+              <div className="flex justify-between items-baseline mb-3">
+                <h3 className="text-lg font-semibold text-slate-700">牛排熟度*</h3>
+                <span className={`font-semibold ${allocatedDonenessCount === quantity ? 'text-green-600' : 'text-red-500'}`}>已分配 {allocatedDonenessCount} / {quantity}</span>
+              </div>
+              <div className="space-y-3">
+                {DONENESS_LEVELS.map(d => (
+                  <div key={d} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg">
+                    <span className="font-medium text-slate-800">{d}</span>
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => handleDonenessChange(d, -1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon className="h-4 w-4" /></button>
+                      <span className="text-lg font-semibold w-8 text-center">{donenessQuantities[d] || 0}</span>
+                      <button onClick={() => handleDonenessChange(d, 1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300" disabled={allocatedDonenessCount >= quantity}><PlusIcon className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {item.customizations?.drinkChoice && (
+            <div>
+                <div className="flex justify-between items-baseline mb-3">
+                    <h3 className="text-lg font-semibold text-slate-700">飲料*</h3>
+                    <span className={`font-semibold ${allocatedDrinkCount === quantity ? 'text-green-600' : 'text-red-500'}`}>已選擇 {allocatedDrinkCount} / {quantity}</span>
+                </div>
+                <div className="space-y-3">
+                    {DRINK_CHOICES.map(drink => (
+                        <div key={drink} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg">
+                            <span className="font-medium text-slate-800">{drink}</span>
+                            <div className="flex items-center gap-3">
+                                <button onClick={() => handleDrinkChange(drink, -1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon className="h-4 w-4" /></button>
+                                <span className="text-lg font-semibold w-8 text-center">{drinkQuantities[drink] || 0}</span>
+                                <button onClick={() => handleDrinkChange(drink, 1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300" disabled={allocatedDrinkCount >= quantity}><PlusIcon className="h-4 w-4" /></button>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+            </div>
+          )}
+
+          {item.customizations?.sauceChoice && (
+            <div>
+              <div className="flex justify-between items-baseline mb-3">
+                <h3 className="text-lg font-semibold text-slate-700">主菜沾醬 (每份選2)</h3>
+                <span className={`font-semibold ${totalSauceCount === totalSauceLimit ? 'text-green-600' : 'text-slate-500'}`}>已選 {totalSauceCount} / {totalSauceLimit}</span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                {SAUCE_CHOICES.map(sauce => (
+                  <div key={sauce} className="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                    <span className="font-medium text-slate-800 text-sm">{sauce}</span>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleSauceChange(sauce, -1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon className="h-4 w-4" /></button>
+                      <span className="text-md font-semibold w-5 text-center">{selectedSauces.find(s => s.name === sauce)?.quantity || 0}</span>
+                      <button onClick={() => handleSauceChange(sauce, 1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300" disabled={totalSauceCount >= totalSauceLimit}><PlusIcon className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          
+          {Object.entries(addonGroups).map(([category, addonList]) => (
+            <div key={category}>
+              <h3 className="text-lg font-semibold text-slate-700 mb-3">{category}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {addonList.map(addon => (
+                  <div key={addon.id} className="flex items-center justify-between bg-slate-100 p-3 rounded-md">
+                    <div>
+                      <span className="text-slate-800 text-sm">{addon.name}</span>
+                      <span className="ml-2 font-semibold text-slate-500 text-sm">+${addon.price}</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => handleAddonQuantityChange(addon, -1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon className="h-4 w-4" /></button>
+                      <span className="text-lg font-semibold w-6 text-center">{selectedAddons.find(a => a.id === addon.id)?.quantity || 0}</span>
+                      <button onClick={() => handleAddonQuantityChange(addon, 1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300"><PlusIcon className="h-4 w-4" /></button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+
+           {item.customizations?.notes && (
+            <div>
+              <h3 className="text-lg font-semibold text-slate-700 mb-3">備註</h3>
+              <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="有任何特殊需求嗎？" className="w-full p-3 border border-slate-300 rounded-md focus:ring-2 focus:ring-green-500 focus:outline-none transition"></textarea>
+            </div>
+          )}
+        </main>
+
+        <footer className="p-6 border-t bg-slate-50">
+          <button onClick={handleSubmit} className="w-full bg-green-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-green-700 transition-colors text-lg">
+            加入購物車 - 總計 ${totalPrice}
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+// --- components/Cart.tsx ---
+type CartProps = {
+  isOpen: boolean;
+  onClose: () => void;
+  cartItems: CartItem[];
+  onUpdateQuantity: (cartId: string, newQuantity: number) => void;
+  onRemoveItem: (cartId: string) => void;
+  onSubmitOrder: (orderData: any) => Promise<any>;
+};
+
+const Cart: React.FC<CartProps> = ({ isOpen, onClose, cartItems, onUpdateQuantity, onRemoveItem, onSubmitOrder }) => {
+  const [isCheckingOut, setIsCheckingOut] = useState(false);
+  const [customerInfo, setCustomerInfo] = useState({ name: '', phone: '', tableNumber: '' });
+  const [orderSubmitted, setOrderSubmitted] = useState(false);
+  const [submittedOrder, setSubmittedOrder] = useState<any>(null);
+
+  useEffect(() => {
+    if (!isOpen) {
+        setTimeout(() => {
+            setOrderSubmitted(false);
+            setSubmittedOrder(null);
+            setIsCheckingOut(false);
+        }, 300);
+    }
+  }, [isOpen]);
+
+  const totalPrice = useMemo(() => cartItems.reduce((total, item) => total + item.totalPrice, 0), [cartItems]);
+
+  const handleCheckout = async () => {
+    if (!customerInfo.name.trim() || !customerInfo.phone.trim()) {
+      alert('請填寫姓名和電話');
+      return;
+    }
+    if (!/^[0-9]{10}$/.test(customerInfo.phone)) {
+        alert('請輸入有效的手機號碼（10位數字）');
+        return;
+    }
+
+    setIsCheckingOut(true);
+    try {
+      const orderData = { items: cartItems, totalPrice, customerInfo };
+      const result = await onSubmitOrder(orderData);
+      if (result.success) {
+        setSubmittedOrder(result);
+        setOrderSubmitted(true);
+      } else {
+        alert('訂單提交失敗: ' + (result.message || '未知錯誤'));
+      }
+    } catch (error: any) {
+      alert('訂單提交失敗: ' + error.message);
+    } finally {
+      setIsCheckingOut(false);
+    }
+  };
+
+  const handleNewOrder = () => {
+    onClose();
+  };
+  
+  const CartSuccessView = () => (
+    <div className="flex flex-col h-full">
+        <div className="flex justify-between items-center p-5 border-b">
+            <h2 className="text-2xl font-bold text-slate-800">訂單確認</h2>
+            <button onClick={handleNewOrder} className="text-slate-500 hover:text-slate-800"><CloseIcon /></button>
+        </div>
+        <div className="flex-grow flex flex-col justify-center items-center p-6 text-center">
+            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                <CheckIcon className="h-8 w-8 text-green-600" />
+            </div>
+            <h3 className="text-2xl font-bold text-slate-800 mb-2">訂單提交成功!</h3>
+            <p className="text-slate-500 mb-4">我們會盡快為您準備餐點。</p>
+            <p className="text-2xl font-bold text-green-700 mb-6">總金額: ${totalPrice}</p>
+            <button onClick={handleNewOrder} className="w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition-colors">
+                繼續點餐
+            </button>
+        </div>
+    </div>
+  );
+
+  const CartMainView = () => (
+    <div className="flex flex-col h-full">
+      <div className="flex justify-between items-center p-5 border-b">
+        <h2 className="text-2xl font-bold text-slate-800">我的購物車</h2>
+        <button onClick={onClose} className="text-slate-500 hover:text-slate-800"><CloseIcon /></button>
+      </div>
+      
+      {cartItems.length === 0 ? (
+        <div className="flex-grow flex flex-col justify-center items-center text-slate-500 p-4">
+          <CartIcon className="w-24 h-24 mb-4 text-slate-300"/>
+          <p className="text-lg">您的購物車是空的</p>
+        </div>
+      ) : (
+        <>
+        <div className="flex-grow overflow-y-auto">
+          <div className="p-5 space-y-4">
+            {cartItems.map(item => (
+              <div key={item.cartId} className="flex items-start gap-4 p-3 bg-slate-50 rounded-lg">
+                <div className="flex-grow">
+                  <p className="font-semibold">{item.item.name} <span className="font-normal text-slate-500">x{item.quantity}</span></p>
+                  <div className="text-sm text-slate-600 mt-1 space-y-0.5">
+                    {item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0 && <p>熟度: {Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}</p>}
+                    {item.selectedDrinks && Object.keys(item.selectedDrinks).length > 0 && <p>飲料: {Object.entries(item.selectedDrinks).map(([d, q]) => `${d}x${q}`).join(', ')}</p>}
+                    {item.selectedSauces.length > 0 && <p>沾醬: {item.selectedSauces.map(s => `${s.name}${s.quantity > 1 ? `x${s.quantity}`: ''}`).join(', ')}</p>}
+                    {item.selectedAddons.map(addon => <p key={addon.id}>加購: {addon.name} x{addon.quantity} (+${addon.price * addon.quantity})</p>)}
+                    {item.selectedNotes && <p className="text-blue-600">備註: {item.selectedNotes}</p>}
+                  </div>
+                </div>
+                <div className="text-right flex flex-col items-end">
+                  <p className="font-bold text-lg">${item.totalPrice}</p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <button onClick={() => onUpdateQuantity(item.cartId, item.quantity - 1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon className="h-4 w-4" /></button>
+                    <span className="font-semibold w-8 text-center">{item.quantity}</span>
+                    <button onClick={() => onUpdateQuantity(item.cartId, item.quantity + 1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300"><PlusIcon className="h-4 w-4" /></button>
+                    <button onClick={() => onRemoveItem(item.cartId)} className="text-red-500 hover:text-red-700 ml-2"><TrashIcon className="h-5 w-5"/></button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <div className="p-5 border-t bg-slate-100">
+            <h3 className="text-lg font-semibold mb-3 text-slate-700">顧客資訊</h3>
+            <div className="space-y-3">
+              <input type="text" placeholder="姓名 *" value={customerInfo.name} onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))} className="w-full p-2 border border-slate-300 rounded-md" required />
+              <input type="tel" placeholder="電話 * (10位數字)" value={customerInfo.phone} onChange={(e) => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))} className="w-full p-2 border border-slate-300 rounded-md" pattern="[0-9]{10}" required />
+              <input type="text" placeholder="桌號 (可選)" value={customerInfo.tableNumber} onChange={(e) => setCustomerInfo(prev => ({ ...prev, tableNumber: e.target.value }))} className="w-full p-2 border border-slate-300 rounded-md" />
+            </div>
+          </div>
+        </div>
+        <div className="p-5 border-t bg-slate-50">
+          <div className="flex justify-between items-center mb-4">
+            <span className="text-xl font-medium">總計</span>
+            <span className="text-3xl font-bold text-green-700">${totalPrice}</span>
+          </div>
+          <button onClick={handleCheckout} disabled={isCheckingOut} className="w-full bg-green-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-green-700 transition-colors text-lg disabled:bg-slate-400 disabled:cursor-not-allowed">
+            {isCheckingOut ? "提交中..." : "確認訂單"}
+          </button>
+        </div>
+        </>
+      )}
+    </div>
+  );
+
+  return (
+    <>
+      <div className={`fixed inset-0 bg-black bg-opacity-50 z-30 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
+      <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-lg z-40 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+        {orderSubmitted ? <CartSuccessView /> : <CartMainView />}
+      </div>
+    </>
+  );
+};
+
+
+// --- App.tsx ---
+const App: React.FC = () => {
+    const [cart, setCart] = useState<CartItem[]>([]);
+    const [isCartOpen, setIsCartOpen] = useState(false);
+    const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
+
+    const [menuData, setMenuData] = useState<MenuCategory[]>([]);
+    const [addons, setAddons] = useState<Addon[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [isRefreshing, setIsRefreshing] = useState(false);
+    const [notification, setNotification] = useState<string | null>(null);
+
+    const fetchData = useCallback(async () => {
+        setNotification(null);
+        const { menu, addons, from } = await apiService.getMenuAndAddons();
+        setMenuData(menu);
+        setAddons(addons);
+        if (from === 'fallback') {
+            setNotification('無法連接伺服器，顯示為離線菜單。');
+        }
+    }, []);
+
+    useEffect(() => {
+        const initialLoad = async () => {
+            setLoading(true);
+            await fetchData();
+            setLoading(false);
+        };
+        initialLoad();
+    }, [fetchData]);
+
+    const handleRefresh = async () => {
+        setIsRefreshing(true);
+        await fetchData();
+        setIsRefreshing(false);
     };
 
-    // === 其他組件 Cart, App 保持不變 ===
-    // ... 請將 Cart 和 App 組件完整貼上（略）
+    const handleSelectItem = (item: MenuItem) => {
+        setSelectedItem(item);
+    };
 
-    // === 渲染 ===
-    const container = document.getElementById('root');
-    const root = ReactDOM.createRoot(container);
-    root.render(<App />);
-  </script>
+    const handleCloseModal = () => setSelectedItem(null);
+
+    const handleAddToCart = useCallback((item: MenuItem, quantity: number, options: any) => {
+        const { donenesses, drinks, addons, notes, sauces } = options;
+
+        const generateStableObjectString = (obj: any) => {
+            if (!obj || Object.keys(obj).length === 0) return '';
+            return JSON.stringify(Object.fromEntries(Object.entries(obj).filter(([, val]) => val && Number(val) > 0).sort(([keyA], [keyB]) => keyA.localeCompare(keyB))));
+        };
+
+        const addonsPrice = (addons || []).reduce((sum: number, addon: any) => sum + (addon.price * addon.quantity), 0);
+        const baseItemPrice = item.price + addonsPrice;
+        
+        const cartKeyFields = {
+            id: item.id,
+            donenesses: generateStableObjectString(donenesses),
+            drinks: generateStableObjectString(drinks),
+            notes: notes,
+            addons: (addons || []).map((a: any) => `${a.id}:${a.quantity}`).sort().join(','),
+            sauces: (sauces || []).map((s: any) => `${s.name}:${s.quantity}`).sort().join(','),
+        };
+        const cartKey = JSON.stringify(cartKeyFields);
+
+        setCart(prevCart => {
+            const existingItemIndex = prevCart.findIndex(cartItem => cartItem.cartId.startsWith(cartKey + '-'));
+
+            if (existingItemIndex > -1) {
+                const updatedCart = [...prevCart];
+                const existingItem = updatedCart[existingItemIndex];
+                const newQuantity = existingItem.quantity + quantity;
+                updatedCart[existingItemIndex] = { 
+                    ...existingItem, 
+                    quantity: newQuantity,
+                    totalPrice: baseItemPrice * newQuantity,
+                };
+                return updatedCart;
+            } else {
+                const newCartItem: CartItem = { 
+                    cartId: cartKey + '-' + Date.now(), 
+                    item, 
+                    quantity, 
+                    selectedDonenesses: donenesses,
+                    selectedDrinks: drinks,
+                    selectedAddons: addons || [],
+                    selectedSauces: sauces || [],
+                    selectedNotes: notes,
+                    totalPrice: baseItemPrice * quantity,
+                };
+                return [...prevCart, newCartItem];
+            }
+        });
+    }, []);
+
+    const handleUpdateQuantity = (cartId: string, newQuantity: number) => {
+        setCart(prevCart => {
+            if (newQuantity <= 0) {
+                return prevCart.filter(item => item.cartId !== cartId);
+            }
+            return prevCart.map(item => {
+                if (item.cartId === cartId) {
+                    const addonsPrice = item.selectedAddons.reduce((sum, addon) => sum + (addon.price * addon.quantity), 0);
+                    const newTotalPrice = (item.item.price + addonsPrice) * newQuantity;
+                    return { ...item, quantity: newQuantity, totalPrice: newTotalPrice };
+                }
+                return item;
+            });
+        });
+    };
+
+    const handleRemoveFromCart = (cartId: string) => {
+        setCart(prevCart => prevCart.filter(item => item.cartId !== cartId));
+    };
+
+    const handleSubmitOrder = async (orderData: any): Promise<any> => {
+        const result = await apiService.submitOrder(orderData);
+        if (result.success) {
+            setCart([]);
+        }
+        return result;
+    };
+    
+    const cartItemCount = useMemo(() => cart.reduce((total, item) => total + item.quantity, 0), [cart]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex flex-col justify-center items-center bg-slate-100">
+                <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-green-700"></div>
+                <p className="mt-4 text-slate-600 text-lg">正在載入菜單...</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="min-h-screen bg-slate-100 text-slate-800">
+             {notification && (
+                <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 text-center" role="alert">
+                    <p>{notification}</p>
+                </div>
+            )}
+            <header className="bg-white shadow-md sticky top-0 z-20">
+                <div className="container mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-green-800 tracking-wider">美味廚房點餐系統</h1>
+                    <button onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium disabled:opacity-50">
+                        <RefreshIcon className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}/>
+                        <span>{isRefreshing ? '刷新中' : '刷新'}</span>
+                    </button>
+                </div>
+            </header>
+
+            <main className="container mx-auto p-4 md:p-6 lg:p-8">
+                <Menu menuData={menuData} onSelectItem={handleSelectItem} />
+            </main>
+
+            {cartItemCount > 0 && (
+                <button
+                    onClick={() => setIsCartOpen(true)}
+                    className="fixed bottom-6 right-6 lg:bottom-10 lg:right-10 flex items-center justify-center bg-green-700 text-white rounded-full shadow-lg hover:bg-green-800 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-700 focus:ring-opacity-50 h-16 w-16"
+                    aria-label={`查看購物車，共有 ${cartItemCount} 項商品`}
+                >
+                    <CartIcon className="h-8 w-8" />
+                    <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold">{cartItemCount}</span>
+                </button>
+            )}
+
+            <Cart
+                isOpen={isCartOpen}
+                onClose={() => setIsCartOpen(false)}
+                cartItems={cart}
+                onUpdateQuantity={handleUpdateQuantity}
+                onRemoveItem={handleRemoveFromCart}
+                onSubmitOrder={handleSubmitOrder}
+            />
+
+            {selectedItem && (
+                <ItemModal
+                    item={selectedItem}
+                    addons={addons}
+                    onClose={handleCloseModal}
+                    onAddToCart={handleAddToCart}
+                />
+            )}
+        </div>
+    );
+};
+
+// --- index.tsx ---
+const rootElement = document.getElementById('root');
+if (!rootElement) {
+  throw new Error("Could not find root element to mount to");
+}
+
+const root = ReactDOM.createRoot(rootElement);
+root.render(
+  <React.StrictMode>
+    <App />
+  </React.StrictMode>
+);
+
+</script>
 </body>
 </html>
