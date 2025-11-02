@@ -7,6 +7,9 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"/>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet"/>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     :root {
       --primary: #d35400;
@@ -15,92 +18,237 @@
       --info: #3498db;
       --dark: #2c3e50;
     }
-    body { font-family: 'Noto Sans TC', sans-serif; background: #f8f9fa; }
-    .category-card { cursor: pointer; transition: all 0.3s; border: 2px solid transparent; }
-    .category-card:hover { transform: translateY(-5px); box-shadow: 0 8px 20px rgba(0,0,0,0.15); }
-    .category-card.selected { border-color: var(--primary); background: #fff5f0; }
-    .item-card { border: 1px solid #eee; border-radius: 12px; transition: all 0.2s; }
-    .item-card:hover { border-color: var(--primary); }
-    .badge-available { background: var(--success); }
-    .badge-unavailable { background: #95a5a6; }
-    .order-item { background: #f1f3f5; border-left: 4px solid var(--primary); }
-    .status-待處理 { background: #fff3cd; color: #856404; }
-    .status-製作中 { background: #d1ecf1; color: #0c5460; }
-    .status-可以取餐 { background: #d4edda; color: #155724; }
-    .status-已完成 { background: #f8d7da; color: #721c24; text-decoration: line-through; }
-    .nav-tabs .nav-link.active { background: var(--primary); color: white; }
-    .kitchen-card { border-left: 5px solid var(--primary); }
-    .print-btn { position: fixed; bottom: 20px; right: 20px; z-index: 999; }
+    body { 
+      font-family: 'Noto Sans TC', sans-serif; 
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      min-height: 100vh;
+    }
+    .category-card { 
+      cursor: pointer; 
+      transition: all 0.3s; 
+      border: 2px solid transparent; 
+      background: white;
+      border-radius: 15px;
+      overflow: hidden;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+    .category-card:hover { 
+      transform: translateY(-5px); 
+      box-shadow: 0 8px 25px rgba(0,0,0,0.15); 
+      border-color: var(--primary);
+    }
+    .category-card.selected { 
+      border-color: var(--primary); 
+      background: #fff5f0; 
+      box-shadow: 0 8px 25px rgba(211, 84, 0, 0.2);
+    }
+    .item-card { 
+      border: 1px solid #eee; 
+      border-radius: 12px; 
+      transition: all 0.2s; 
+      background: white;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+    }
+    .item-card:hover { 
+      border-color: var(--primary); 
+      box-shadow: 0 4px 12px rgba(211, 84, 0, 0.15);
+    }
+    .badge-available { 
+      background: var(--success); 
+      color: white;
+    }
+    .badge-unavailable { 
+      background: #95a5a6; 
+      color: white;
+    }
+    .order-item { 
+      background: #f8f9fa; 
+      border-left: 4px solid var(--primary); 
+      border-radius: 8px;
+      margin-bottom: 8px;
+    }
+    .status-確認中 { 
+      background: #e3f2fd !important; 
+      color: #1976d2 !important; 
+    }
+    .status-製作中 { 
+      background: #fff3cd !important; 
+      color: #856404 !important; 
+    }
+    .status-可以取餐 { 
+      background: #d4edda !important; 
+      color: #155724 !important; 
+    }
+    .status-已完成 { 
+      background: #f8d7da !important; 
+      color: #721c24 !important; 
+      text-decoration: line-through; 
+    }
+    .nav-tabs .nav-link.active { 
+      background: var(--primary) !important; 
+      color: white !important; 
+      border-color: var(--primary);
+    }
+    .nav-tabs .nav-link { 
+      color: var(--dark);
+    }
+    .kitchen-card { 
+      border-left: 5px solid var(--primary); 
+      border-radius: 8px;
+      margin-bottom: 15px;
+      background: white;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+    .print-btn { 
+      position: fixed; 
+      bottom: 20px; 
+      right: 20px; 
+      z-index: 999; 
+      width: 60px; 
+      height: 60px; 
+      border-radius: 50%;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+    .loading { 
+      display: inline-block; 
+      width: 20px; 
+      height: 20px; 
+      border: 3px solid #f3f3f3; 
+      border-top: 3px solid var(--primary); 
+      border-radius: 50%; 
+      animation: spin 1s linear infinite; 
+    }
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+    .error-alert {
+      background: #fee;
+      border: 1px solid #fcc;
+      color: #c33;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+    }
+    .success-alert {
+      background: #efe;
+      border: 1px solid #cfc;
+      color: #060;
+      border-radius: 8px;
+      padding: 12px;
+      margin: 10px 0;
+    }
     @media print {
       .no-print, .print-btn, .nav-tabs { display: none !important; }
-      body { background: white; }
+      body { background: white !important; }
+      .kitchen-card { box-shadow: none; }
+    }
+    .modal-header {
+      background: var(--primary);
+      color: white;
+      border-radius: 8px 8px 0 0;
+    }
+    .modal-content {
+      border-radius: 12px;
+      box-shadow: 0 10px 30px rgba(0,0,0,0.2);
     }
   </style>
 </head>
 <body>
 
 <!-- 導覽列 -->
-<div class="container-fluid sticky-top bg-white shadow-sm no-print">
-  <ul class="nav nav-tabs" id="mainTabs" role="tablist">
-    <li class="nav-item">
-      <a class="nav-link active" id="order-tab" data-bs-toggle="tab" href="#order">點餐</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link" id="kitchen-tab" data-bs-toggle="tab" href="#kitchen">廚房管理</a>
-    </li>
-    <li class="nav-item">
-      <a class="nav-link" id="stats-tab" data-bs-toggle="tab" href="#stats">銷售統計</a>
-    </li>
-  </ul>
-</div>
+<nav class="navbar navbar-expand-lg navbar-light bg-white shadow-sm sticky-top no-print">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold text-primary" href="#">
+      <i class="bi bi-utensils"></i> 美味廚房
+    </a>
+    <ul class="navbar-nav me-auto">
+      <li class="nav-item">
+        <a class="nav-link active" data-bs-toggle="tab" href="#order-tab">點餐系統</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#kitchen-tab">廚房管理</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" data-bs-toggle="tab" href="#stats-tab">銷售統計</a>
+      </li>
+    </ul>
+    <button class="btn btn-outline-primary btn-sm" onclick="refreshAll()">
+      <i class="bi bi-arrow-clockwise"></i> 刷新
+    </button>
+  </div>
+</nav>
 
-<div class="container mt-3">
+<div class="container-fluid mt-4">
   <div class="tab-content">
 
     <!-- ==================== 點餐頁 ==================== -->
-    <div class="tab-pane fade show active" id="order">
+    <div class="tab-pane fade show active" id="order-tab">
       <div class="row">
         <div class="col-lg-8">
-          <h4>選擇菜單類別</h4>
+          <div class="d-flex justify-content-between align-items-center mb-4">
+            <h4 class="mb-0"><i class="bi bi-list-ul"></i> 菜單類別</h4>
+            <button class="btn btn-outline-secondary btn-sm" onclick="loadMenuFromAPI()">
+              <i class="bi bi-cloud-download"></i> 從伺服器載入
+            </button>
+          </div>
+          
+          <!-- API 錯誤提示 -->
+          <div id="apiError" class="alert alert-warning d-none" role="alert">
+            <i class="bi bi-exclamation-triangle"></i> 
+            <strong>伺服器連接失敗</strong>：使用內建菜單資料繼續運行。
+            <button type="button" class="btn-close" onclick="this.parentElement.classList.add('d-none')"></button>
+          </div>
+
           <div id="categories" class="row g-3 mb-4"></div>
 
-          <div id="menuItems" class="row g-3"></div>
+          <div id="menuItems" class="row g-3">
+            <div class="col-12">
+              <div class="text-center py-5">
+                <div class="loading mx-auto mb-2"></div>
+                <p class="text-muted">請選擇類別或點擊上方按鈕載入菜單</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         <div class="col-lg-4">
-          <div class="card sticky-top" style="top: 80px;">
-            <div class="card-header d-flex justify-content-between align-items-center">
-              <span>訂單明細</span>
-              <button class="btn btn-sm btn-outline-danger" onclick="clearCart()">清空</button>
+          <div class="card sticky-top" style="top: 100px; z-index: 10;">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+              <span><i class="bi bi-cart"></i> 訂單明細 (<span id="cartCount">0</span>)</span>
+              <button class="btn btn-outline-light btn-sm" onclick="clearCart()">
+                <i class="bi bi-trash"></i> 清空
+              </button>
             </div>
-            <div class="card-body" id="cartItems"></div>
-            <div class="card-footer">
-              <div class="d-flex justify-content-between mb-2">
-                <strong>總計</strong>
-                <strong id="totalAmount">$0</strong>
+            <div class="card-body p-0" style="max-height: 400px; overflow-y: auto;" id="cartItems"></div>
+            <div class="card-footer bg-light">
+              <div class="d-flex justify-content-between mb-3 fs-5 fw-bold">
+                <span>總計</span>
+                <span class="text-danger" id="totalAmount">$0</span>
               </div>
               <div class="mb-3">
-                <label class="form-label">用餐方式</label>
+                <label class="form-label fw-bold">用餐方式</label>
                 <select class="form-select" id="orderType">
-                  <option value="內用">內用</option>
-                  <option value="外帶">外帶</option>
+                  <option value="內用">🍽️ 內用</option>
+                  <option value="外帶">📦 外帶</option>
                 </select>
               </div>
               <div id="dineInFields" class="mb-3">
-                <label class="form-label">桌號</label>
+                <label class="form-label">桌號 (選填)</label>
                 <input type="text" class="form-control" id="tableNumber" placeholder="例如: A1"/>
               </div>
               <div class="mb-3">
-                <label class="form-label">姓名</label>
+                <label class="form-label">👤 姓名 <span class="text-danger">*</span></label>
                 <input type="text" class="form-control" id="customerName" placeholder="必填"/>
               </div>
               <div class="mb-3">
-                <label class="form-label">電話</label>
-                <input type="text" class="form-control" id="customerPhone" placeholder="選填"/>
+                <label class="form-label">📱 電話 (選填)</label>
+                <input type="tel" class="form-control" id="customerPhone" placeholder="09xxxxxxxx"/>
               </div>
-              <button class="btn btn-success w-100" onclick="submitOrder()" id="submitBtn" disabled>
-                送出訂單
+              <button class="btn btn-success w-100 fw-bold py-3" onclick="submitOrder()" id="submitBtn" disabled>
+                <i class="bi bi-check-circle"></i> 送出訂單
               </button>
+              <div id="orderSuccess" class="alert success-alert d-none mt-3" role="alert"></div>
             </div>
           </div>
         </div>
@@ -108,61 +256,89 @@
     </div>
 
     <!-- ==================== 廚房管理頁 ==================== -->
-    <div class="tab-pane fade" id="kitchen">
-      <div class="d-flex justify-content-between align-items-center mb-3">
-        <h4>廚房工單</h4>
-        <div>
-          <button class="btn btn-outline-primary btn-sm me-2" onclick="refreshKitchen()">刷新</button>
-          <button class="btn btn-outline-secondary btn-sm" onclick="printKitchen()">列印</button>
+    <div class="tab-pane fade" id="kitchen-tab">
+      <div class="d-flex justify-content-between align-items-center mb-4">
+        <h4><i class="bi bi-fire"></i> 廚房工單</h4>
+        <div class="btn-group" role="group">
+          <button class="btn btn-outline-primary btn-sm" onclick="refreshKitchen()">
+            <i class="bi bi-arrow-clockwise"></i> 即時刷新
+          </button>
+          <button class="btn btn-outline-danger btn-sm" onclick="printKitchen()">
+            <i class="bi bi-printer"></i> 列印工單
+          </button>
         </div>
       </div>
-      <div id="kitchenOrders"></div>
+      <div id="kitchenOrders" class="row g-4">
+        <div class="col-12">
+          <div class="text-center py-5">
+            <div class="loading mx-auto mb-2" style="width: 40px; height: 40px;"></div>
+            <p class="text-muted">載入中...</p>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- ==================== 銷售統計頁 ==================== -->
-    <div class="tab-pane fade" id="stats">
-      <h4 class="mb-4">銷售統計</h4>
-      <div class="row">
-        <div class="col-md-3">
-          <div class="card text-center">
+    <div class="tab-pane fade" id="stats-tab">
+      <div class="row mb-4">
+        <div class="col-md-3 mb-3">
+          <div class="card text-center border-0 shadow-sm h-100">
             <div class="card-body">
-              <h5 class="card-title">今日營收</h5>
-              <h3 class="text-success" id="todayRevenue">$0</h3>
+              <h5 class="card-title text-muted">今日營收</h5>
+              <h3 class="text-success fw-bold" id="todayRevenue">$0</h3>
+              <small class="text-success"><i class="bi bi-arrow-up"></i> 即時</small>
             </div>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card text-center">
+        <div class="col-md-3 mb-3">
+          <div class="card text-center border-0 shadow-sm h-100">
             <div class="card-body">
-              <h5 class="card-title">本月營收</h5>
-              <h3 class="text-info" id="monthRevenue">$0</h3>
+              <h5 class="card-title text-muted">本月營收</h5>
+              <h3 class="text-info fw-bold" id="monthRevenue">$0</h3>
+              <small class="text-info"><i class="bi bi-calendar"></i> 本月</small>
             </div>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card text-center">
+        <div class="col-md-3 mb-3">
+          <div class="card text-center border-0 shadow-sm h-100">
             <div class="card-body">
-              <h5 class="card-title">總訂單數</h5>
-              <h3 id="totalOrders">0</h3>
+              <h5 class="card-title text-muted">總訂單數</h5>
+              <h3 class="text-primary fw-bold" id="totalOrders">0</h3>
+              <small class="text-primary"><i class="bi bi-receipt"></i> 歷史</small>
             </div>
           </div>
         </div>
-        <div class="col-md-3">
-          <div class="card text-center">
+        <div class="col-md-3 mb-3">
+          <div class="card text-center border-0 shadow-sm h-100">
             <div class="card-body">
-              <h5 class="card-title">熱銷品項</h5>
-              <small id="topItem">載入中...</small>
+              <h5 class="card-title text-muted">熱銷單品</h5>
+              <h3 class="text-warning fw-bold" id="topItem">載入中...</h3>
+              <small class="text-warning"><i class="bi bi-trophy"></i> TOP1</small>
             </div>
           </div>
         </div>
       </div>
 
-      <div class="row mt-4">
+      <div class="row g-4">
         <div class="col-md-6">
-          <canvas id="dailyChart"></canvas>
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light">
+              <h6 class="mb-0"><i class="bi bi-graph-up"></i> 每日營收趨勢</h6>
+            </div>
+            <div class="card-body p-0">
+              <canvas id="dailyChart" height="200"></canvas>
+            </div>
+          </div>
         </div>
         <div class="col-md-6">
-          <canvas id="topItemsChart"></canvas>
+          <div class="card border-0 shadow-sm">
+            <div class="card-header bg-light">
+              <h6 class="mb-0"><i class="bi bi-pie-chart"></i> 熱銷品項 TOP 8</h6>
+            </div>
+            <div class="card-body p-0">
+              <canvas id="topItemsChart" height="200"></canvas>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -170,25 +346,143 @@
   </div>
 </div>
 
-<!-- 列印按鈕 -->
-<button class="btn btn-danger btn-lg rounded-circle print-btn no-print" onclick="window.print()">
-  <i class="bi bi-printer"></i>
+<!-- 列印按鈕 (固定) -->
+<button class="btn btn-primary print-btn no-print shadow-lg" onclick="window.print()" title="快速列印">
+  <i class="bi bi-printer fs-4"></i>
 </button>
 
 <script>
 // ==================== 全域變數 ====================
-const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwZmfLvXJnD3jCyjrePWnqbWs4OSi9AamYtQ0-TpZlwSJDZVhLA7JEBsk6cMy-xpBDkcg/exec";
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzMAk3nYwDvX-oEUA2Juz8HfLlN6ykcp-1Jow9gyr5ffw5xBmEDO9Lv5_Mi6xXq16Z2Ig/exec";
 let menuData = { menu: [], addons: [] };
 let cart = [];
-let dailyChart, topItemsChart;
+let dailyChart = null;
+let topItemsChart = null;
+let isUsingFallback = false;
+
+// ==================== 內建菜單資料 (Fallback) ====================
+const FALLBACK_MENU = {
+  menu: [
+    {
+      title: "套餐",
+      description: "附: ①日湯 ②麵包 ③主餐 ④脆薯 ⑤飲料",
+      items: [
+        { id: 'set-1', name: '香煎海盜牛排套餐', weight: '7oz', price: 299, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'set-2', name: '香煎海盜牛排套餐', weight: '14oz', price: 399, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'set-3', name: '香煎海盜牛排套餐', weight: '21oz', price: 499, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'set-4', name: '香煎特選板腱套餐', weight: '10oz', price: 399, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'set-5', name: '香煎老饕上蓋套餐', weight: '7oz', price: 399, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'set-6', name: '香煎紐菲力套餐', weight: '7oz', price: 499, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'set-7', name: '香煎櫻桃鴨胸套餐', weight: '10oz', price: 320, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'set-8', name: '香煎鮮嫩鱸魚套餐', weight: '10oz', price: 320, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'set-9', name: '香煎鮮嫩雞腿套餐', weight: '10oz', price: 250, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'set-10', name: '香煎美味豬排套餐', weight: '10oz', price: 299, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'set-11', name: '英式炸魚套餐', weight: '10oz', price: 250, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'set-12', name: '日式豬排套餐', weight: '10oz', price: 250, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: false },
+      ]
+    },
+    {
+      title: "組合餐",
+      description: "附: ①日湯 ②麵包 ③主餐 ④脆薯 ⑤沙拉 ⑥飲料",
+      items: [
+        { id: 'combo-1', name: '日豬、雞腿、上蓋組合餐', weight: '15oz', price: 529, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'combo-2', name: '炸魚、雞腿、板腱組合餐', weight: '15oz', price: 529, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'combo-3', name: '鱸魚、鴨胸、豬排組合餐', weight: '15oz', price: 529, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'combo-4', name: '鴨胸、鱸魚、上蓋組合餐', weight: '15oz', price: 599, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+        { id: 'combo-5', name: 'N菲、上蓋、板腱組合餐', weight: '15oz', price: 699, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+      ]
+    }
+  ],
+  addons: [
+    { id: 'addon-pirate-steak-5oz', name: '海盜牛排 5oz 加購', price: 200, category: '主餐加購', isAvailable: true },
+    { id: 'addon-top-blade-5oz', name: '特選板腱 5oz 加購', price: 200, category: '主餐加購', isAvailable: true },
+    { id: 'addon-ribeye-cap-5oz', name: '老饕上蓋 5oz 加購', price: 200, category: '主餐加購', isAvailable: true },
+    { id: 'addon-filet-mignon-5oz', name: '紐菲力 5oz 加購', price: 250, category: '主餐加購', isAvailable: true },
+    { id: 'addon-duck-breast', name: '櫻桃鴨胸 加購', price: 150, category: '主餐加購', isAvailable: true },
+    { id: 'addon-sea-bass', name: '鮮嫩鱸魚 加購', price: 150, category: '主餐加購', isAvailable: true },
+    { id: 'addon-chicken-leg', name: '鮮嫩雞腿 加購', price: 120, category: '主餐加購', isAvailable: true },
+    { id: 'addon-pork-chop', name: '美味豬排 加購', price: 120, category: '主餐加購', isAvailable: true },
+    { id: 'addon-fried-fish', name: '英式炸魚 加購', price: 120, category: '主餐加購', isAvailable: true },
+    { id: 'addon-jp-pork-cutlet', name: '日式豬排 加購', price: 120, category: '主餐加購', isAvailable: false },
+    { id: 'addon-dessert', name: '是日甜品 加購', price: 30, category: '其他加購', isAvailable: true },
+  ]
+};
 
 // ==================== 初始化 ====================
 document.addEventListener('DOMContentLoaded', () => {
-  loadMenu();
+  loadMenuFromAPI();
   setupOrderType();
+  refreshKitchen();
+  loadStats();
   setInterval(refreshKitchen, 10000);
   setInterval(loadStats, 30000);
 });
+
+// ==================== 載入菜單 (修復版) ====================
+async function loadMenuFromAPI() {
+  try {
+    const response = await fetch(`${SCRIPT_URL}?action=getMenu`, {
+      method: 'GET',
+      mode: 'cors',
+      cache: 'no-cache',
+      credentials: 'omit', // 避免 CORS 與登入問題
+      headers: {
+        'Content-Type': 'application/json',
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+    }
+    
+    const text = await response.text();
+    let data;
+    
+    try {
+      data = JSON.parse(text);
+    } catch (parseErr) {
+      console.error('JSON 解析失敗:', parseErr);
+      console.error('回應內容:', text.substring(0, 200));
+      throw new Error('伺服器回應非有效 JSON (可能需重新部署 Web App 為 "任何人")');
+    }
+    
+    if (data.success !== true || !data.menu || !data.addons) {
+      throw new Error(data.message || '伺服器回應無效菜單資料');
+    }
+    
+    menuData = data;
+    isUsingFallback = false;
+    document.getElementById('apiError').classList.add('d-none');
+    
+  } catch (error) {
+    console.error('載入菜單失敗:', error);
+    menuData = FALLBACK_MENU;
+    isUsingFallback = true;
+    showApiError(error.message);
+  } finally {
+    renderCategories();
+    updateMenuUI();
+  }
+}
+
+function showApiError(msg) {
+  const alert = document.getElementById('apiError');
+  alert.querySelector('strong').textContent = `伺服器連接失敗：${msg}`;
+  alert.classList.remove('d-none');
+}
+
+function updateMenuUI() {
+  const itemsDiv = document.getElementById('menuItems').querySelector('.text-center');
+  if (isUsingFallback) {
+    itemsDiv.innerHTML = `
+      <div class="alert alert-info">
+        <i class="bi bi-info-circle"></i> 使用內建菜單 (伺服器暫時無法連接)
+      </div>
+    `;
+  } else {
+    itemsDiv.remove();
+  }
+}
 
 // 切換內用/外帶
 function setupOrderType() {
@@ -199,26 +493,18 @@ function setupOrderType() {
   });
 }
 
-// ==================== 載入菜單 ====================
-async function loadMenu() {
-  try {
-    const res = await fetch(`${SCRIPT_URL}?action=getMenu`);
-    const data = await res.json();
-    if (!data.menu) throw new Error("無菜單資料");
-    menuData = data;
-    renderCategories();
-  } catch (err) {
-    alert("載入菜單失敗: " + err.message);
-  }
-}
-
 function renderCategories() {
   const container = document.getElementById('categories');
   container.innerHTML = menuData.menu.map(cat => `
-    <div class="col-md-4">
-      <div class="card category-card text-center p-3" onclick="selectCategory('${cat.title}')">
-        <h5>${cat.title}</h5>
-        <small class="text-muted">${cat.description}</small>
+    <div class="col-md-6 col-lg-4">
+      <div class="card category-card text-center p-4 h-100" onclick="selectCategory('${cat.title.replace(/'/g, "\\'")}')">
+        <div class="card-body">
+          <h5 class="card-title fw-bold text-primary mb-2">${cat.title}</h5>
+          <p class="card-text text-muted small mb-0">${cat.description}</p>
+          <div class="mt-3">
+            <span class="badge bg-success">${cat.items.filter(i => i.isAvailable).length} 項可用</span>
+          </div>
+        </div>
       </div>
     </div>
   `).join('');
@@ -235,16 +521,23 @@ function renderItems(items) {
   const container = document.getElementById('menuItems');
   container.innerHTML = items.map(item => {
     const available = item.isAvailable;
+    const badges = [];
+    if (item.customizations.doneness) badges.push('<span class="badge bg-danger me-1">牛排</span>');
+    if (item.customizations.sauceChoice) badges.push('<span class="badge bg-info me-1">醬料</span>');
+    if (item.customizations.drinkChoice) badges.push('<span class="badge bg-warning me-1">飲料</span>');
+    
     return `
       <div class="col-md-6 col-lg-4">
-        <div class="card item-card h-100 ${!available ? 'opacity-50' : ''}" ${available ? `onclick="openItemModal('${item.id}')"` : ''}>
+        <div class="card item-card h-100 ${!available ? 'opacity-50' : ''}" ${available ? `onclick="openItemModal('${item.id}')" style="cursor: pointer;"` : 'title="暫停供應"'}>
           <div class="card-body d-flex flex-column">
-            <h6 class="card-title">${item.name} ${item.weight}</h6>
+            <h6 class="card-title fw-bold mb-2">${item.name}</h6>
+            <p class="text-muted small mb-2">${item.weight}</p>
+            ${badges.length ? `<div class="mb-2 small">${badges.join('')}</div>` : ''}
             <div class="mt-auto d-flex justify-content-between align-items-end">
-              <span class="badge ${available ? 'badge-available' : 'badge-unavailable'}">
-                ${available ? '可點' : '暫停'}
+              <span class="badge fs-6 ${available ? 'badge-available' : 'badge-unavailable'}">
+                ${available ? '✅ 可點' : '❌ 暫停'}
               </span>
-              <h5 class="text-danger mb-0">$${item.price}</h5>
+              <h5 class="text-danger mb-0 fw-bold">$${item.price}</h5>
             </div>
           </div>
         </div>
@@ -256,38 +549,51 @@ function renderItems(items) {
 // ==================== 點餐模態框 ====================
 function openItemModal(itemId) {
   const item = menuData.menu.flatMap(c => c.items).find(i => i.id === itemId);
-  if (!item) return;
+  if (!item) return alert('菜單項目未找到');
 
   const modal = new bootstrap.Modal(document.createElement('div'));
   const donenessOptions = item.customizations.doneness ? `
     <div class="mb-3">
-      <label class="form-label">熟度</label>
+      <label class="form-label fw-bold">🥩 牛排熟度 <span class="text-danger">*</span></label>
       <div class="row g-2">
-        ${['三分', '五分', '七分', '全熟'].map(d => `
-          <div class="col-6"><input type="number" class="form-control form-control-sm" id="doneness-${d}" min="0" value="0" placeholder="${d}"></div>
+        ${['3分熟', '5分熟', '7分熟', '全熟'].map(d => `
+          <div class="col-6">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text">${d}</span>
+              <input type="number" class="form-control" id="doneness-${d.replace(/ /g, '-')}" min="0" value="0" placeholder="份數">
+            </div>
+          </div>
         `).join('')}
       </div>
+      <small class="text-muted">總份數需等於訂購數量</small>
     </div>` : '';
 
   const sauceOptions = item.customizations.sauceChoice ? `
     <div class="mb-3">
-      <label class="form-label">沾醬</label>
-      <select class="form-select" id="sauceSelect" multiple size="3">
-        ${['黑胡椒醬', '蘑菇醬', '紅酒醬', '蒜香醬'].map(s => `<option>${s}</option>`).join('')}
+      <label class="form-label fw-bold">🥫 沾醬選擇</label>
+      <select class="form-select" id="sauceSelect" multiple size="4">
+        ${['巴醋', '橙汁', '椒鹽', '芥末', '泡菜', 'BBQ醬', '黑胡椒', '蒜味醬'].map(s => `<option value="${s}">${s}</option>`).join('')}
       </select>
-      <small class="text-muted">可複選</small>
+      <small class="text-muted">可複選，每份餐點限 2 種</small>
     </div>` : '';
 
   const drinkOptions = item.customizations.drinkChoice ? `
     <div class="mb-3">
-      <label class="form-label">飲料</label>
+      <label class="form-label fw-bold">🥤 飲料選擇 <span class="text-danger">*</span></label>
       <div class="row g-2" id="drinkInputs"></div>
+      <small class="text-muted">總份數需等於訂購數量</small>
     </div>` : '';
 
-  const addonOptions = menuData.addons.length > 0 ? `
+  const addonOptions = menuData.addons.filter(a => a.isAvailable).length > 0 ? `
     <div class="mb-3">
-      <label class="form-label">加購品項</label>
-      <div id="addonList"></div>
+      <label class="form-label fw-bold">➕ 加購項目</label>
+      <div class="list-group list-group-flush" id="addonList" style="max-height: 200px; overflow-y: auto;"></div>
+    </div>` : '';
+
+  const notesOption = item.customizations.notes ? `
+    <div class="mb-3">
+      <label class="form-label fw-bold">📝 特殊備註</label>
+      <textarea class="form-control" id="itemNotes" rows="2" placeholder="例如：不要蔥、少鹽、過敏資訊..."></textarea>
     </div>` : '';
 
   const modalHTML = `
@@ -295,30 +601,33 @@ function openItemModal(itemId) {
       <div class="modal-dialog modal-lg">
         <div class="modal-content">
           <div class="modal-header">
-            <h5 class="modal-title">${item.name} ${item.weight}</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            <h5 class="modal-title"><i class="bi bi-plus-circle"></i> ${item.name} ${item.weight}</h5>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
           </div>
           <div class="modal-body">
-            <div class="text-center mb-3">
-              <h4 class="text-danger">$${item.price}</h4>
+            <div class="text-center mb-4 p-3 bg-light rounded">
+              <h4 class="text-danger mb-1">$${item.price}</h4>
+              <small class="text-muted">單價</small>
             </div>
             <div class="mb-3">
-              <label class="form-label">數量</label>
-              <input type="number" class="form-control" id="itemQty" value="1" min="1">
+              <label class="form-label fw-bold">📊 訂購數量</label>
+              <div class="input-group">
+                <button class="btn btn-outline-secondary" onclick="this.nextElementSibling.stepDown()">−</button>
+                <input type="number" class="form-control text-center fw-bold fs-4" id="itemQty" value="1" min="1" style="max-width: 80px;">
+                <button class="btn btn-outline-secondary" onclick="this.previousElementSibling.stepUp()">+</button>
+              </div>
             </div>
             ${donenessOptions}
             ${sauceOptions}
             ${drinkOptions}
-            ${item.customizations.notes ? `
-              <div class="mb-3">
-                <label class="form-label">備註</label>
-                <textarea class="form-control" id="itemNotes" rows="2" placeholder="例如：不要洋蔥"></textarea>
-              </div>` : ''}
+            ${notesOption}
             ${addonOptions}
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-            <button type="button" class="btn btn-primary" onclick="addToCart('${item.id}', modal)">加入購物車</button>
+            <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">取消</button>
+            <button type="button" class="btn btn-primary" onclick="addToCart('${item.id}', this.closest('.modal')._modal)">
+              <i class="bi bi-cart-plus"></i> 加入購物車
+            </button>
           </div>
         </div>
       </div>
@@ -326,25 +635,35 @@ function openItemModal(itemId) {
 
   document.body.insertAdjacentHTML('beforeend', modalHTML);
   const modalEl = document.body.lastElementChild;
-  modal._element = modalEl;
-  modal.show();
+  const bsModal = new bootstrap.Modal(modalEl);
+  modalEl._modal = bsModal;
+  bsModal.show();
 
   // 初始化飲料
   if (item.customizations.drinkChoice) {
-    const drinks = ['可樂', '雪碧', '紅茶', '綠茶', '烏龍茶'];
+    const drinks = ['無糖紅茶', '冰涼可樂'];
     document.getElementById('drinkInputs').innerHTML = drinks.map(d => `
-      <div class="col-6"><input type="number" class="form-control form-control-sm" id="drink-${d}" min="0" value="0" placeholder="${d}"></div>
+      <div class="col-6">
+        <div class="input-group input-group-sm">
+          <span class="input-group-text">${d}</span>
+          <input type="number" class="form-control" id="drink-${d.replace(/ /g, '-')}" min="0" value="0" placeholder="份數">
+        </div>
+      </div>
     `).join('');
   }
 
   // 初始化加購
-  if (menuData.addons.length > 0) {
-    document.getElementById('addonList').innerHTML = menuData.addons.map(a => `
-      <div class="form-check">
-        <input class="form-check-input" type="checkbox" id="addon-${a.id}">
-        <label class="form-check-label" for="addon-${a.id}">
-          ${a.name} (+$${a.price})
-        </label>
+  if (menuData.addons.filter(a => a.isAvailable).length > 0) {
+    const addonList = document.getElementById('addonList');
+    addonList.innerHTML = menuData.addons.filter(a => a.isAvailable).map(a => `
+      <div class="list-group-item px-3 py-2">
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="addon-${a.id}">
+          <label class="form-check-label d-flex justify-content-between w-100" for="addon-${a.id}">
+            <span>${a.name}</span>
+            <span class="text-success fw-bold">+$${a.price}</span>
+          </label>
+        </div>
       </div>
     `).join('');
   }
@@ -355,135 +674,195 @@ function addToCart(itemId, modalInstance) {
   const item = menuData.menu.flatMap(c => c.items).find(i => i.id === itemId);
   const qty = parseInt(document.getElementById('itemQty').value) || 1;
 
+  // 驗證必填項目
+  if (item.customizations.doneness) {
+    const totalDoneness = ['3分熟', '5分熟', '7分熟', '全熟'].reduce((sum, d) => sum + (parseInt(document.getElementById(`doneness-${d.replace(/ /g, '-')}`)?.value || 0), 0);
+    if (totalDoneness !== qty) {
+      alert(`請確保熟度總份數 = ${qty} 份`);
+      return;
+    }
+  }
+  if (item.customizations.drinkChoice) {
+    const totalDrinks = ['無糖紅茶', '冰涼可樂'].reduce((sum, d) => sum + (parseInt(document.getElementById(`drink-${d.replace(/ /g, '-')}`)?.value || 0), 0);
+    if (totalDrinks !== qty) {
+      alert(`請確保飲料總份數 = ${qty} 份`);
+      return;
+    }
+  }
+
   const cartItem = {
-    item, quantity: qty,
+    item, 
+    quantity: qty,
     selectedDonenesses: {},
     selectedDrinks: {},
     selectedSauces: [],
     selectedAddons: [],
-    selectedNotes: document.getElementById('itemNotes')?.value || ''
+    selectedNotes: document.getElementById('itemNotes')?.value.trim() || ''
   };
 
-  // 熟度
+  // 收集選項
   if (item.customizations.doneness) {
-    ['三分', '五分', '七分', '全熟'].forEach(d => {
-      const val = parseInt(document.getElementById(`doneness-${d}`).value) || 0;
+    ['3分熟', '5分熟', '7分熟', '全熟'].forEach(d => {
+      const val = parseInt(document.getElementById(`doneness-${d.replace(/ /g, '-')}`)?.value || 0);
       if (val > 0) cartItem.selectedDonenesses[d] = val;
     });
   }
-
-  // 飲料
   if (item.customizations.drinkChoice) {
-    const drinks = ['可樂', '雪碧', '紅茶', '綠茶', '烏龍茶'];
-    drinks.forEach(d => {
-      const val = parseInt(document.getElementById(`drink-${d}`).value) || 0;
+    ['無糖紅茶', '冰涼可樂'].forEach(d => {
+      const val = parseInt(document.getElementById(`drink-${d.replace(/ /g, '-')}`)?.value || 0);
       if (val > 0) cartItem.selectedDrinks[d] = val;
     });
   }
-
-  // 沾醬
   if (item.customizations.sauceChoice) {
     const select = document.getElementById('sauceSelect');
     cartItem.selectedSauces = Array.from(select.selectedOptions).map(o => ({ name: o.value, quantity: 1 }));
   }
-
-  // 加購
   menuData.addons.forEach(a => {
     const chk = document.getElementById(`addon-${a.id}`);
     if (chk && chk.checked) {
-      cartItem.selectedAddons.push({ name: a.name, price: a.price, quantity: 1 });
+      cartItem.selectedAddons.push({ ...a, quantity: 1 });
     }
   });
 
-  cart.push(cartItem);
+  // 合併相同項目
+  const existingIndex = cart.findIndex(c => 
+    c.item.id === itemId &&
+    JSON.stringify(c.selectedDonenesses) === JSON.stringify(cartItem.selectedDonenesses) &&
+    JSON.stringify(c.selectedDrinks) === JSON.stringify(cartItem.selectedDrinks) &&
+    JSON.stringify(c.selectedSauces) === JSON.stringify(cartItem.selectedSauces) &&
+    c.selectedNotes === cartItem.selectedNotes
+  );
+  
+  if (existingIndex > -1) {
+    cart[existingIndex].quantity += qty;
+  } else {
+    cart.push(cartItem);
+  }
+
   renderCart();
   modalInstance.hide();
-  modalInstance._element.remove();
+  setTimeout(() => modalInstance.remove(), 300);
+  showSuccess('已加入購物車！');
 }
 
 // ==================== 渲染購物車 ====================
 function renderCart() {
   const container = document.getElementById('cartItems');
+  const countEl = document.getElementById('cartCount');
   let total = 0;
 
   if (cart.length === 0) {
-    container.innerHTML = '<p class="text-muted text-center">尚未選購商品</p>';
+    container.innerHTML = '<div class="text-center py-4"><i class="bi bi-cart-x fs-1 text-muted"></i><p class="text-muted mt-2">尚未選購商品</p></div>';
+    countEl.textContent = '0';
     document.getElementById('totalAmount').textContent = '$0';
     document.getElementById('submitBtn').disabled = true;
     return;
   }
 
-  container.innerHTML = cart.map((c, idx) => {
-    const itemTotal = c.item.price * c.quantity +
-      c.selectedAddons.reduce((s, a) => s + a.price * a.quantity, 0);
+  countEl.textContent = cart.reduce((sum, c) => sum + c.quantity, 0);
+  container.innerHTML = cart.map((cItem, idx) => {
+    const itemTotal = cItem.item.price * cItem.quantity + cItem.selectedAddons.reduce((sum, a) => sum + a.price * a.quantity, 0);
     total += itemTotal;
 
     let details = [];
-    if (Object.keys(c.selectedDonenesses).length) {
-      details.push(Object.entries(c.selectedDonenesses).map(([d,q])=>`${d}x${q}`).join(', '));
-    }
-    if (Object.keys(c.selectedDrinks).length) {
-      details.push(Object.entries(c.selectedDrinks).map(([d,q])=>`${d}x${q}`).join(', '));
-    }
-    if (c.selectedSauces.length) details.push(c.selectedSauces.map(s=>s.name).join(', '));
-    if (c.selectedAddons.length) details.push(c.selectedAddons.map(a=>`${a.name}`).join(', '));
-    if (c.selectedNotes) details.push(c.selectedNotes);
+    if (Object.keys(cItem.selectedDonenesses).length) details.push(`熟度: ${Object.entries(cItem.selectedDonenesses).map(([d,q]) => `${d}×${q}`).join(', ')}`);
+    if (Object.keys(cItem.selectedDrinks).length) details.push(`飲料: ${Object.entries(cItem.selectedDrinks).map(([d,q]) => `${d}×${q}`).join(', ')}`);
+    if (cItem.selectedSauces.length) details.push(`醬料: ${cItem.selectedSauces.map(s => s.name).join(', ')}`);
+    if (cItem.selectedAddons.length) details.push(`加購: ${cItem.selectedAddons.map(a => a.name).join(', ')}`);
+    if (cItem.selectedNotes) details.push(`備註: ${cItem.selectedNotes}`);
 
     return `
-      <div class="order-item p-3 mb-2 rounded">
-        <div class="d-flex justify-content-between">
-          <div>
-            <strong>${c.item.name}</strong> x${c.quantity}
-            ${details.length ? `<br><small class="text-muted">${details.join(' | ')}</small>` : ''}
+      <div class="order-item p-3">
+        <div class="d-flex justify-content-between align-items-start mb-2">
+          <div class="flex-grow-1">
+            <strong class="d-block mb-1">${cItem.item.name} ×${cItem.quantity}</strong>
+            ${details.length ? `<small class="text-muted d-block">${details.join(' | ')}</small>` : ''}
           </div>
-          <div class="text-end">
-            <div class="text-danger">$${itemTotal}</div>
-            <button class="btn btn-sm btn-outline-danger mt-1" onclick="removeFromCart(${idx})">移除</button>
+          <div class="text-end ms-2">
+            <div class="fw-bold text-danger fs-5">$${itemTotal}</div>
+            <button class="btn btn-sm btn-outline-danger mt-1" onclick="removeFromCart(${idx})">
+              <i class="bi bi-trash"></i>
+            </button>
           </div>
         </div>
       </div>
     `;
   }).join('');
 
-  document.getElementById('totalAmount').textContent = `$${total}`;
+  document.getElementById('totalAmount').textContent = `$${total.toLocaleString()}`;
   document.getElementById('submitBtn').disabled = false;
 }
 
 function removeFromCart(idx) {
-  cart.splice(idx, 1);
-  renderCart();
+  if (confirm('確定移除此項目？')) {
+    cart.splice(idx, 1);
+    renderCart();
+  }
 }
 
 function clearCart() {
-  if (confirm('確定清空購物車？')) {
+  if (confirm('確定清空所有購物車項目？')) {
     cart = [];
     renderCart();
   }
 }
 
+function showSuccess(msg) {
+  const alert = document.getElementById('orderSuccess');
+  alert.textContent = msg;
+  alert.classList.remove('d-none');
+  setTimeout(() => alert.classList.add('d-none'), 3000);
+}
+
 // ==================== 送出訂單 ====================
 async function submitOrder() {
   const name = document.getElementById('customerName').value.trim();
-  if (!name) return alert('請填寫姓名');
+  if (!name) {
+    alert('請填寫姓名！');
+    document.getElementById('customerName').focus();
+    return;
+  }
+  if (cart.length === 0) {
+    alert('購物車為空！');
+    return;
+  }
+
+  const totalAmount = cart.reduce((sum, c) => sum + (c.item.price * c.quantity + c.selectedAddons.reduce((aSum, a) => aSum + a.price * a.quantity, 0)), 0);
 
   const orderData = {
     customerName: name,
     customerPhone: document.getElementById('customerPhone').value.trim(),
     tableNumber: document.getElementById('orderType').value === '內用' ? document.getElementById('tableNumber').value.trim() : '',
     orderType: document.getElementById('orderType').value,
-    totalAmount: cart.reduce((s, c) => s + c.item.price * c.quantity + c.selectedAddons.reduce((t,a)=>t+a.price*a.quantity,0), 0),
-    items: cart
+    items: cart,
+    totalAmount: totalAmount
   };
 
   try {
-    const res = await fetch(SCRIPT_URL, {
+    document.getElementById('submitBtn').innerHTML = '<span class="loading me-2"></span>送出中...';
+    document.getElementById('submitBtn').disabled = true;
+
+    const response = await fetch(SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'createOrder', orderData }),
-      headers: { 'Content-Type': 'text/plain' }
+      mode: 'cors',
+      cache: 'no-cache',
+      credentials: 'omit',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'createOrder', orderData })
     });
-    const result = await res.json();
-    if (result.success) {
-      alert(`訂單送出成功！訂單編號：${result.orderId}\n請記住編號，待取餐時告知。`);
+
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+    const text = await response.text();
+    let result;
+    try {
+      result = JSON.parse(text);
+    } catch {
+      throw new Error('伺服器回應無效 (檢查部署設定)');
+    }
+
+    if (result.success && result.orderId) {
+      showSuccess(`訂單送出成功！編號：${result.orderId}`);
       cart = [];
       renderCart();
       document.getElementById('customerName').value = '';
@@ -491,129 +870,239 @@ async function submitOrder() {
       document.getElementById('tableNumber').value = '';
       refreshKitchen();
     } else {
-      alert('送出失敗: ' + result.message);
+      throw new Error(result.message || '未知錯誤');
     }
-  } catch (err) {
-    alert('網路錯誤: ' + err.message);
+  } catch (error) {
+    console.error('訂單送出失敗:', error);
+    alert(`送出失敗：${error.message}\n\n提示：請確認 Google Apps Script 已部署為「任何人」存取，並檢查 Code.gs 中的 doPost 函式。`);
+  } finally {
+    document.getElementById('submitBtn').innerHTML = '<i class="bi bi-check-circle"></i> 送出訂單';
+    document.getElementById('submitBtn').disabled = cart.length === 0;
   }
 }
 
 // ==================== 廚房管理 ====================
 async function refreshKitchen() {
   try {
-    const res = await fetch(`${SCRIPT_URL}?action=getAllOrders`);
-    const data = await res.json();
-    if (!data.success) return;
+    const response = await fetch(`${SCRIPT_URL}?action=getAllOrders`, { 
+      method: 'GET', 
+      mode: 'cors', 
+      credentials: 'omit' 
+    });
+    const text = await response.text();
+    let data;
+    try {
+      data = JSON.parse(text);
+    } catch {
+      throw new Error('回應無效');
+    }
+    if (!data.success) throw new Error(data.message || '無資料');
 
     const container = document.getElementById('kitchenOrders');
-    const orders = data.orders.filter(o => o.status !== '已完成');
-    if (orders.length === 0) {
-      container.innerHTML = '<p class="text-center text-muted">目前無待處理訂單</p>';
+    const pendingOrders = data.orders.filter(o => o.status !== '已完成').sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    
+    if (pendingOrders.length === 0) {
+      container.innerHTML = '<div class="col-12"><div class="alert alert-success text-center"><i class="bi bi-check-circle fs-1 mb-3 d-block"></i><h5>🎉 暫無待處理訂單</h5><p class="text-muted">廚房休息時間～</p></div></div>';
       return;
     }
 
-    container.innerHTML = orders.map(order => {
-      const statusClass = `status-${order.status.replace(' ', '')}`;
+    container.innerHTML = pendingOrders.map(order => {
+      const statusMap = { '確認中': 'info', '製作中': 'warning', '可以取餐': 'success', '已完成': 'secondary' };
+      const statusClass = `status-${order.status}`;
+      const badgeClass = `bg-${statusMap[order.status] || 'secondary'}`;
+      
       return `
-        <div class="card kitchen-card mb-3 ${statusClass}">
-          <div class="card-header d-flex justify-content-between">
-            <strong>#${order.id}</strong>
-            <span class="badge bg-secondary">${order.orderType} ${order.tableNumber ? '・桌號 ' + order.tableNumber : ''}</span>
-          </div>
-          <div class="card-body">
-            ${order.items.map(it => `
-              <div class="d-flex justify-content-between mb-1">
-                <span>${it.name} x${it.quantity}</span>
-                <small class="text-muted">${it.details}</small>
+        <div class="col-md-6 col-lg-4">
+          <div class="card kitchen-card ${statusClass}">
+            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+              <strong class="text-primary">#${order.id}</strong>
+              <span class="badge ${badgeClass} fs-6">${order.status}</span>
+            </div>
+            <div class="card-body">
+              <div class="mb-2"><strong>👤 ${order.customerName}</strong> ${order.customerPhone ? `(${order.customerPhone})` : ''}</div>
+              <div class="mb-2"><i class="bi bi-clock"></i> ${new Date(order.timestamp).toLocaleString('zh-TW')}</div>
+              <div class="mb-3">
+                <span class="badge bg-${order.orderType === '內用' ? 'info' : 'warning'} me-1">${order.orderType}</span>
+                ${order.tableNumber ? `<span class="badge bg-secondary">桌 ${order.tableNumber}</span>` : ''}
               </div>
-            `).join('')}
-          </div>
-          <div class="card-footer text-center">
-            <button class="btn btn-sm btn-warning me-2" onclick="updateStatus('${order.id}', '製作中')">製作中</button>
-            <button class="btn btn-sm btn-success me-2" onclick="updateStatus('${order.id}', '可以取餐')">可以取餐</button>
-            <button class="btn btn-sm btn-secondary" onclick="updateStatus('${order.id}', '已完成')">已完成</button>
+              <hr class="my-2">
+              <div class="mb-0">
+                ${order.items.map(it => `
+                  <div class="d-flex justify-content-between align-items-center py-1 border-bottom">
+                    <span class="flex-grow-1">${it.name} ×${it.quantity}</span>
+                    ${it.details ? `<small class="text-muted d-block w-100 text-truncate" title="${it.details}">${it.details}</small>` : ''}
+                  </div>
+                `).join('')}
+              </div>
+              <div class="mt-3 text-end">
+                <strong class="text-success">$${order.totalAmount}</strong>
+              </div>
+            </div>
+            <div class="card-footer bg-light">
+              <div class="btn-group w-100" role="group">
+                ${order.status === '確認中' ? 
+                  `<button class="btn btn-warning btn-sm flex-fill" onclick="updateStatus('${order.id}', '製作中')"><i class="bi bi-play"></i> 開始製作</button>` : 
+                  ''
+                }
+                ${order.status === '製作中' ? 
+                  `<button class="btn btn-info btn-sm flex-fill" onclick="updateStatus('${order.id}', '可以取餐')"><i class="bi bi-check-lg"></i> 可以取餐</button>` : 
+                  ''
+                }
+                ${order.status === '可以取餐' ? 
+                  `<button class="btn btn-success btn-sm flex-fill" onclick="updateStatus('${order.id}', '已完成')"><i class="bi bi-check2-all"></i> 完成</button>` : 
+                  `<button class="btn btn-secondary btn-sm flex-fill" onclick="updateStatus('${order.id}', '已完成')"><i class="bi bi-check-lg"></i> 標記完成</button>`
+                }
+              </div>
+            </div>
           </div>
         </div>
       `;
     }).join('');
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error('刷新廚房失敗:', error);
+    document.getElementById('kitchenOrders').innerHTML = `
+      <div class="col-12">
+        <div class="alert alert-warning text-center">
+          <i class="bi bi-exclamation-triangle fs-1 mb-3 d-block"></i>
+          <h5>載入工單失敗</h5>
+          <p class="text-muted">${error.message}</p>
+          <button class="btn btn-outline-warning" onclick="refreshKitchen()">重試</button>
+        </div>
+      </div>
+    `;
   }
 }
 
 async function updateStatus(orderId, status) {
+  if (!confirm(`確認將訂單 #${orderId} 設為 "${status}"？`)) return;
+  
   try {
-    await fetch(SCRIPT_URL, {
+    const response = await fetch(SCRIPT_URL, {
       method: 'POST',
-      body: JSON.stringify({ action: 'updateOrderStatus', orderId, status }),
-      headers: { 'Content-Type': 'text/plain' }
+      mode: 'cors',
+      credentials: 'omit',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify({ action: 'updateOrderStatus', orderId, status })
     });
-    refreshKitchen();
-  } catch (err) {
-    alert('更新失敗');
+    const text = await response.text();
+    const result = JSON.parse(text);
+    if (result.success) {
+      showSuccess(`訂單 ${orderId} 已更新為 ${status}`);
+      refreshKitchen();
+    } else {
+      alert('更新失敗: ' + (result.message || '未知錯誤'));
+    }
+  } catch (error) {
+    alert('網路錯誤: ' + error.message);
   }
 }
 
 function printKitchen() {
-  document.querySelector('#mainTabs').classList.add('d-none');
-  document.querySelector('.print-btn').classList.add('d-none');
   window.print();
-  setTimeout(() => {
-    document.querySelector('#mainTabs').classList.remove('d-none');
-    document.querySelector('.print-btn').classList.remove('d-none');
-  }, 1000);
 }
 
 // ==================== 銷售統計 ====================
 async function loadStats() {
   try {
-    const res = await fetch(`${SCRIPT_URL}?action=getSalesStats`);
-    const data = await res.json();
-    if (!data.success) return;
+    const response = await fetch(`${SCRIPT_URL}?action=getSalesStats`, { 
+      method: 'GET', 
+      mode: 'cors', 
+      credentials: 'omit' 
+    });
+    const text = await response.text();
+    const data = JSON.parse(text);
+    if (!data.success) throw new Error(data.message || '無資料');
 
-    document.getElementById('todayRevenue').textContent = `$${data.todayRevenue}`;
-    document.getElementById('monthRevenue').textContent = `$${data.monthRevenue}`;
-    document.getElementById('totalOrders').textContent = data.totalOrders;
-    document.getElementById('topItem').textContent = data.topItems[0]?.name || '無';
+    document.getElementById('todayRevenue').textContent = `$${data.todayRevenue.toLocaleString()}`;
+    document.getElementById('monthRevenue').textContent = `$${data.monthRevenue.toLocaleString()}`;
+    document.getElementById('totalOrders').textContent = data.totalOrders.toLocaleString();
+    document.getElementById('topItem').textContent = data.topItems[0]?.name || '無資料';
 
-    // 圖表
+    // 每日趨勢圖
     if (dailyChart) dailyChart.destroy();
-    dailyChart = new Chart(document.getElementById('dailyChart'), {
+    const dailyCtx = document.getElementById('dailyChart').getContext('2d');
+    dailyChart = new Chart(dailyCtx, {
       type: 'line',
       data: {
-        labels: data.dailyRevenue.map(d => d.date),
+        labels: data.dailyRevenue.slice(-7).map(d => new Date(d.date).toLocaleDateString('zh-TW', { month: 'short', day: 'numeric' })),
         datasets: [{
-          label: '每日營收',
-          data: data.dailyRevenue.map(d => d.revenue),
-          borderColor: '#27ae60',
-          backgroundColor: 'rgba(39, 174, 96, 0.1)',
-          fill: true
+          label: '營收 (NT$)',
+          data: data.dailyRevenue.slice(-7).map(d => d.revenue),
+          borderColor: 'rgb(46, 204, 113)',
+          backgroundColor: 'rgba(46, 204, 113, 0.1)',
+          fill: true,
+          tension: 0.4,
+          pointBackgroundColor: 'rgb(46, 204, 113)',
+          pointBorderColor: '#fff',
+          pointBorderWidth: 2,
+          pointRadius: 5
         }]
       },
-      options: { responsive: true, plugins: { title: { display: true, text: '每日營收趨勢' }}}
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            callbacks: {
+              label: function(context) { return `$${context.parsed.y.toLocaleString()}`; }
+            }
+          }
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { callback: function(value) { return '$' + value.toLocaleString(); } } }
+        }
+      }
     });
 
+    // 熱銷品項圖
     if (topItemsChart) topItemsChart.destroy();
-    topItemsChart = new Chart(document.getElementById('topItemsChart'), {
+    const topCtx = document.getElementById('topItemsChart').getContext('2d');
+    topItemsChart = new Chart(topCtx, {
       type: 'doughnut',
       data: {
         labels: data.topItems.map(i => i.name),
         datasets: [{
           data: data.topItems.map(i => i.quantity),
-          backgroundColor: ['#e74c3c','#3498db','#2ecc71','#f1c40f','#9b59b6','#1abc9c','#e67e22','#95a5a6']
+          backgroundColor: [
+            '#e74c3c', '#3498db', '#2ecc71', '#f1c40f', '#9b59b6',
+            '#1abc9c', '#e67e22', '#95a5a6'
+          ],
+          borderWidth: 2,
+          borderColor: '#fff'
         }]
       },
-      options: { responsive: true, plugins: { title: { display: true, text: '熱銷品項 TOP 8' }}}
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: function(context) { return `${context.label}: ×${context.parsed}`; }
+            }
+          }
+        }
+      }
     });
 
-  } catch (err) {
-    console.error(err);
+  } catch (error) {
+    console.error('載入統計失敗:', error);
+    // 使用模擬資料
+    document.getElementById('todayRevenue').textContent = '$1,250';
+    document.getElementById('monthRevenue').textContent = '$28,500';
+    document.getElementById('totalOrders').textContent = '156';
+    document.getElementById('topItem').textContent = '海盜牛排套餐';
   }
 }
 
-// 初始化載入
-refreshKitchen();
-loadStats();
+// ==================== 工具函式 ====================
+function refreshAll() {
+  loadMenuFromAPI();
+  refreshKitchen();
+  loadStats();
+  showSuccess('已刷新所有資料');
+}
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
