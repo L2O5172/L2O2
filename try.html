@@ -14,21 +14,25 @@
             -webkit-tap-highlight-color: transparent;
         }
         @media print {
-            body > *:not(.print-container) {
-                display: none !important;
+            body * {
+                visibility: hidden;
+            }
+            .print-area, .print-area * {
+                visibility: visible;
             }
             .print-area {
-                display: block !important;
+                position: absolute !important;
+                left: 0 !important;
+                top: 0 !important;
+                width: 100% !important;
             }
-            .print-container {
-                position: absolute;
-                top: 0;
-                left: 0;
-                width: 100%;
-                display: block !important;
-                font-size: 12px;
+            .print-area * {
+                color: #000 !important;
+                background-color: transparent !important;
+                box-shadow: none !important;
+                border-color: #ddd !important;
             }
-            .print-container button, .print-container a, .no-print {
+            .no-print {
                 display: none !important;
             }
         }
@@ -783,20 +787,22 @@
             };
 
             return (
-                <>
                 <div className="flex flex-col h-full">
-                    <div className="flex justify-between items-center p-5 border-b no-print">
+                    <div className="flex justify-between items-center p-5 border-b no-print flex-shrink-0">
                         <h2 className="text-2xl font-bold text-slate-800">訂單確認</h2>
                         <button onClick={handleNewOrder} className="text-slate-500 hover:text-slate-800"><CloseIcon /></button>
                     </div>
-                    <div className="flex-grow flex flex-col justify-center items-center p-6 text-center">
-                        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                            <CheckIcon className="h-8 w-8 text-green-600" />
+
+                    <div className="flex-grow overflow-y-auto p-6">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+                                <CheckIcon className="h-8 w-8 text-green-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-slate-800 mb-2">訂單提交成功!</h3>
+                            <p className="text-slate-500 mb-4">我們會盡快為您準備餐點。</p>
                         </div>
-                        <h3 className="text-2xl font-bold text-slate-800 mb-2">訂單提交成功!</h3>
-                        <p className="text-slate-500 mb-4">我們會盡快為您準備餐點。</p>
                                                 
-                        {!orderDetails ? <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-700 my-4"></div> : (
+                        {!orderDetails ? <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-700 my-4 mx-auto"></div> : (
                             <div className="w-full text-left">
                                 <div ref={printRef} className="print-area w-full bg-slate-50 p-4 rounded-lg mb-4 border space-y-2">
                                     <div className="print-container">
@@ -815,7 +821,7 @@
                                         </div>
                                         
                                         <div className="border-t border-slate-300 pt-2 mt-2">
-                                            <div className="max-h-[20rem] overflow-y-auto pr-2 text-sm space-y-4">
+                                            <div className="text-sm space-y-4">
                                                 <div className="bg-white rounded-lg p-3">
                                                     <h4 className="text-base font-bold text-slate-700 mb-2 pb-1 border-b">餐點列表</h4>
                                                     <div className="space-y-3 text-sm">
@@ -865,13 +871,13 @@
                                 </div>
                             </div>
                         )}
-                        
-                        <button onClick={handleNewOrder} className="mt-6 w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition-colors no-print">
+                    </div>
+                    <div className="p-5 border-t bg-slate-50 flex-shrink-0 no-print">
+                        <button onClick={handleNewOrder} className="w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition-colors">
                             繼續點餐
                         </button>
                     </div>
                 </div>
-                </>
             );
         };
 
