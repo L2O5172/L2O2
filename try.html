@@ -259,6 +259,38 @@
             const [orderHistory, setOrderHistory] = React.useState([]);
             
             const printRef = React.useRef(null);
+            
+            const aggregatedOptions = React.useMemo(() => {
+                if (!searchResult || !searchResult.items) return { drinks: {}, sauces: {}, addons: {} };
+                
+                const drinks = {};
+                const sauces = {};
+                const addons = {};
+
+                searchResult.items.forEach(cartItem => {
+                    if (cartItem.selectedDrinks) {
+                        Object.entries(cartItem.selectedDrinks).forEach(([name, quantity]) => {
+                            drinks[name] = (drinks[name] || 0) + quantity;
+                        });
+                    }
+                    if (cartItem.selectedSauces) {
+                        cartItem.selectedSauces.forEach(sauce => {
+                            sauces[sauce.name] = (sauces[sauce.name] || 0) + sauce.quantity;
+                        });
+                    }
+                    if (cartItem.selectedAddons) {
+                        cartItem.selectedAddons.forEach(addon => {
+                            addons[addon.name] = {
+                                quantity: (addons[addon.name]?.quantity || 0) + addon.quantity,
+                                price: addon.price
+                            };
+                        });
+                    }
+                });
+
+                return { drinks, sauces, addons };
+            }, [searchResult]);
+
 
             const handleSearch = async (idToSearch) => {
                 const orderId = idToSearch || orderIdInput.trim();
@@ -299,17 +331,43 @@
             
             const handleLineShare = () => {
                 if (!searchResult || !searchResult.items) return;
-                const itemsText = searchResult.items.map(item => `- ${item.item.name} x${item.quantity}`).join('\n');
-                const text = `我的訂單 #${searchResult.id}\n類型: ${searchResult.orderType}\n狀態: ${searchResult.status}\n\n餐點:\n${itemsText}\n\n總金額: $${searchResult.totalAmount}\n感謝您的訂購！`;
+                
+                const itemsText = searchResult.items.map(item => {
+                    let itemDetails = [`- ${item.item.name} x${item.quantity}`];
+                    if (item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0) {
+                        itemDetails.push(`  熟度: ${Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}`);
+                    }
+                     if (item.selectedNotes) {
+                        itemDetails.push(`  備註: ${item.selectedNotes}`);
+                    }
+                    return itemDetails.join('\n');
+                }).join('\n\n');
+
+                let aggregatedTextParts = [];
+                if (Object.keys(aggregatedOptions.drinks).length > 0) {
+                    aggregatedTextParts.push(`飲料: ${Object.entries(aggregatedOptions.drinks).map(([name, q]) => `${name} x${q}`).join(', ')}`);
+                }
+                if (Object.keys(aggregatedOptions.sauces).length > 0) {
+                    aggregatedTextParts.push(`沾醬: ${Object.entries(aggregatedOptions.sauces).map(([name, q]) => `${name} x${q}`).join(', ')}`);
+                }
+                if (Object.keys(aggregatedOptions.addons).length > 0) {
+                    aggregatedTextParts.push(`加購:\n${Object.entries(aggregatedOptions.addons).map(([name, {quantity, price}]) => `  - ${name} x${quantity} (+${price * quantity})`).join('\n')}`);
+                }
+                const aggregatedText = aggregatedTextParts.join('\n');
+                const finalAggregatedText = aggregatedText ? `\n\n訂單選項總覽:\n${aggregatedText}` : '';
+
+                const text = `我的訂單 #${searchResult.id}\n類型: ${searchResult.orderType}\n狀態: ${searchResult.status}\n\n餐點列表:\n${itemsText}${finalAggregatedText}\n\n總金額: $${searchResult.totalAmount}\n感謝您的訂購！`;
+                
                 const url = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
                 window.open(url, '_blank');
             };
             
             const getStatusColor = (status) => {
                 switch (status) {
-                    case '製作中': return 'bg-yellow-500 text-white';
-                    case '已完成': return 'bg-green-600 text-white';
-                    case '待處理': return 'bg-blue-500 text-white';
+                    case '確認中': return 'bg-blue-500 text-white';
+                    case '準備中': return 'bg-yellow-500 text-white';
+                    case '可以取餐': return 'bg-purple-500 text-white';
+                    case '完成': return 'bg-green-600 text-white';
                     default: return 'bg-slate-500 text-white';
                 }
             };
@@ -716,10 +774,10 @@
             React.useEffect(() => {
                 if (orderId && orderData) {
                     // Immediately build the details object so the UI can render.
-                    // Assume 'Pending' status until we hear back from the server.
+                    // Assume 'Confirming' status until we hear back from the server.
                     const initialDetails = {
                         id: orderId,
-                        status: '待處理',
+                        status: '確認中',
                         orderType: orderData.orderType,
                         items: orderData.items,
                         totalAmount: orderData.totalPrice
@@ -735,7 +793,7 @@
                                 status: result.order.status
                             }));
                         }
-                        // If it fails, we just stick with '待處理'
+                        // If it fails, we just stick with '確認中'
                     };
                     fetchStatus();
                 } else {
@@ -780,8 +838,33 @@
 
             const handleLineShare = () => {
                 if (!orderDetails || !orderDetails.items) return;
-                const itemsText = orderDetails.items.map(item => `- ${item.item.name} x${item.quantity}`).join('\n');
-                const text = `我的訂單 #${orderDetails.id}\n類型: ${orderDetails.orderType}\n狀態: ${orderDetails.status}\n\n餐點:\n${itemsText}\n\n總金額: $${orderDetails.totalAmount}\n感謝您的訂購！`;
+                
+                const itemsText = orderDetails.items.map(item => {
+                    let itemDetails = [`- ${item.item.name} x${item.quantity}`];
+                    if (item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0) {
+                        itemDetails.push(`  熟度: ${Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}`);
+                    }
+                     if (item.selectedNotes) {
+                        itemDetails.push(`  備註: ${item.selectedNotes}`);
+                    }
+                    return itemDetails.join('\n');
+                }).join('\n\n');
+
+                let aggregatedTextParts = [];
+                if (Object.keys(aggregatedOptions.drinks).length > 0) {
+                    aggregatedTextParts.push(`飲料: ${Object.entries(aggregatedOptions.drinks).map(([name, q]) => `${name} x${q}`).join(', ')}`);
+                }
+                if (Object.keys(aggregatedOptions.sauces).length > 0) {
+                    aggregatedTextParts.push(`沾醬: ${Object.entries(aggregatedOptions.sauces).map(([name, q]) => `${name} x${q}`).join(', ')}`);
+                }
+                if (Object.keys(aggregatedOptions.addons).length > 0) {
+                    aggregatedTextParts.push(`加購:\n${Object.entries(aggregatedOptions.addons).map(([name, {quantity, price}]) => `  - ${name} x${quantity} (+${price * quantity})`).join('\n')}`);
+                }
+                const aggregatedText = aggregatedTextParts.join('\n');
+                const finalAggregatedText = aggregatedText ? `\n\n訂單選項總覽:\n${aggregatedText}` : '';
+
+                const text = `我的訂單 #${orderDetails.id}\n類型: ${orderDetails.orderType}\n狀態: ${orderDetails.status}\n\n餐點列表:\n${itemsText}${finalAggregatedText}\n\n總金額: $${orderDetails.totalAmount}\n感謝您的訂購！`;
+                
                 const url = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
                 window.open(url, '_blank');
             };
