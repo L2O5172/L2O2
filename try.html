@@ -165,7 +165,7 @@
 
 
         // From apiService.ts
-        const API_URL = 'https://script.google.com/macros/s/AKfycbyaXy8Ys2H4jjuXJQPMykU6EvDuU74eYxCNbMyQ0qB-Y2eX-EyrLcUDWpZ3AVJMJQl4/exec';
+        const API_URL = 'https://script.google.com/macros/s/AKfycbx83vpj3iuB6rPorzWodu9pVw3UyMSzsfUBwQZe9a90ZSvWdZvr16D_uhIbjV3mpvvJ/exec';
 
         const apiService = {
           async getMenuAndAddons() {
@@ -187,19 +187,6 @@
 
           async submitOrder(orderData) {
             try {
-                const simplifiedItems = orderData.items.map((cartItem) => ({
-                    name: `${cartItem.item.name}${cartItem.item.weight ? ` (${cartItem.item.weight})` : ''}`,
-                    quantity: cartItem.quantity,
-                    totalPrice: cartItem.totalPrice,
-                    customizations: {
-                        doneness: cartItem.selectedDonenesses ? Object.entries(cartItem.selectedDonenesses).map(([d, q]) => `${d} x${q}`).join(', ') : 'N/A',
-                        drinks: cartItem.selectedDrinks ? Object.entries(cartItem.selectedDrinks).map(([d, q]) => `${d} x${q}`).join(', ') : 'N/A',
-                        sauces: cartItem.selectedSauces.map(s => `${s.name}${s.quantity > 1 ? `x${s.quantity}`: ''}`).join(', ') || 'None',
-                        addons: cartItem.selectedAddons.map(a => `${a.name} x${a.quantity}`).join(', ') || 'None',
-                        notes: cartItem.selectedNotes || 'None',
-                    }
-                }));
-
                 const payload = {
                     action: 'createOrder',
                     orderData: {
@@ -207,7 +194,7 @@
                         customerPhone: orderData.customerInfo.phone,
                         tableNumber: orderData.customerInfo.tableNumber,
                         orderType: orderData.orderType,
-                        items: JSON.stringify(simplifiedItems, null, 2),
+                        items: orderData.items, // Pass the full cart items array
                         totalAmount: orderData.totalPrice,
                         timestamp: new Date().toISOString(),
                     },
@@ -307,8 +294,8 @@
             };
             
             const handleLineShare = () => {
-                if (!searchResult) return;
-                const itemsText = searchResult.items.map(item => `- ${item.name} x${item.quantity}`).join('\n');
+                if (!searchResult || !searchResult.items) return;
+                const itemsText = searchResult.items.map(item => `- ${item.item.name} x${item.quantity}`).join('\n');
                 const text = `我的訂單 #${searchResult.id}\n類型: ${searchResult.orderType}\n狀態: ${searchResult.status}\n\n餐點:\n${itemsText}\n\n總金額: $${searchResult.totalAmount}\n感謝您的訂購！`;
                 const url = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
                 window.open(url, '_blank');
@@ -395,11 +382,14 @@
                                     </div>
                                     <div className="border-t pt-3">
                                         <h4 className="font-semibold mb-2">餐點項目:</h4>
-                                        <ul className="space-y-2 text-slate-700">
-                                            {searchResult.items.map((item, index) => (
-                                                <li key={index} className="border-b pb-2">
-                                                    <p className="font-medium">{item.name} x{item.quantity}</p>
-                                                    <p className="text-xs text-slate-500 pl-2">{item.details}</p>
+                                        <ul className="space-y-2 text-slate-700 text-sm">
+                                            {(searchResult.items || []).map((item, index) => (
+                                                <li key={item.cartId || index} className="border-b pb-2 last:border-b-0">
+                                                    <p className="font-medium">{item.item.name} x{item.quantity}</p>
+                                                    <div className="text-xs text-slate-500 pl-2">
+                                                        {item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0 && <p>熟度: {Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}</p>}
+                                                        {item.selectedNotes && <p>備註: {item.selectedNotes}</p>}
+                                                    </div>
                                                 </li>
                                             ))}
                                         </ul>
@@ -733,14 +723,45 @@
                     fetchDetails();
                 }
             }, [orderId]);
+            
+            const aggregatedOptions = React.useMemo(() => {
+                if (!orderDetails || !orderDetails.items) return { drinks: {}, sauces: {}, addons: {} };
+                
+                const drinks = {};
+                const sauces = {};
+                const addons = {};
+
+                orderDetails.items.forEach(cartItem => {
+                    if (cartItem.selectedDrinks) {
+                        Object.entries(cartItem.selectedDrinks).forEach(([name, quantity]) => {
+                            drinks[name] = (drinks[name] || 0) + quantity;
+                        });
+                    }
+                    if (cartItem.selectedSauces) {
+                        cartItem.selectedSauces.forEach(sauce => {
+                            sauces[sauce.name] = (sauces[sauce.name] || 0) + sauce.quantity;
+                        });
+                    }
+                    if (cartItem.selectedAddons) {
+                        cartItem.selectedAddons.forEach(addon => {
+                            addons[addon.name] = {
+                                quantity: (addons[addon.name]?.quantity || 0) + addon.quantity,
+                                price: addon.price
+                            };
+                        });
+                    }
+                });
+
+                return { drinks, sauces, addons };
+            }, [orderDetails]);
 
             const handlePrint = () => {
                 window.print();
             };
 
             const handleLineShare = () => {
-                if (!orderDetails) return;
-                const itemsText = orderDetails.items.map(item => `- ${item.name} x${item.quantity}`).join('\n');
+                if (!orderDetails || !orderDetails.items) return;
+                const itemsText = orderDetails.items.map(item => `- ${item.item.name} x${item.quantity}`).join('\n');
                 const text = `我的訂單 #${orderDetails.id}\n類型: ${orderDetails.orderType}\n狀態: ${orderDetails.status}\n\n餐點:\n${itemsText}\n\n總金額: $${orderDetails.totalAmount}\n感謝您的訂購！`;
                 const url = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
                 window.open(url, '_blank');
@@ -781,16 +802,41 @@
                                         </div>
                                         
                                         <div className="border-t border-slate-300 pt-2 mt-2">
-                                            <h4 className="font-semibold mb-1 text-slate-600">餐點詳情:</h4>
-                                            <div className="max-h-40 overflow-y-auto pr-2 text-sm">
-                                                <ul className="space-y-2 text-slate-700">
+                                            <div className="max-h-[20rem] overflow-y-auto pr-2 text-sm space-y-4">
+                                                <div className="bg-white rounded-lg p-3">
+                                                    <h4 className="text-base font-bold text-slate-700 mb-2 pb-1 border-b">餐點列表</h4>
+                                                    <div className="space-y-3 text-sm">
                                                     {orderDetails.items.map((item, index) => (
-                                                        <li key={index} className="border-b border-slate-200 pb-2 last:border-b-0">
-                                                            <p className="font-medium">{item.name} x{item.quantity}</p>
-                                                            {item.details && <p className="text-xs text-slate-500 pl-2">{item.details}</p>}
-                                                        </li>
+                                                      <div key={item.cartId || index}>
+                                                          <p className="font-medium text-slate-800">{item.item.name.replace(/半全餐|半套餐/g, '套餐')} <span className="font-normal">x{item.quantity}</span></p>
+                                                          <div className="text-xs text-slate-500 pl-2">
+                                                            {item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0 && <p>熟度: {Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}</p>}
+                                                            {item.selectedNotes && <p>備註: {item.selectedNotes}</p>}
+                                                          </div>
+                                                      </div>
                                                     ))}
-                                                </ul>
+                                                    </div>
+                                                </div>
+
+                                                {(Object.keys(aggregatedOptions.drinks).length > 0 || Object.keys(aggregatedOptions.sauces).length > 0 || Object.keys(aggregatedOptions.addons).length > 0) && (
+                                                    <div className="bg-slate-100 rounded-lg p-3 text-xs">
+                                                        <h5 className="font-bold text-slate-600 border-b pb-1 mb-2">訂單選項總覽</h5>
+                                                        <div className="text-slate-700 space-y-1">
+                                                            {Object.keys(aggregatedOptions.drinks).length > 0 && <p><span className="font-semibold">飲料:</span> {Object.entries(aggregatedOptions.drinks).map(([name, q]) => `${name} x${q}`).join(', ')}</p>}
+                                                            {Object.keys(aggregatedOptions.sauces).length > 0 && <p><span className="font-semibold">沾醬:</span> {Object.entries(aggregatedOptions.sauces).map(([name, q]) => `${name} x${q}`).join(', ')}</p>}
+                                                            {Object.keys(aggregatedOptions.addons).length > 0 && (
+                                                                <div>
+                                                                    <p className="font-semibold">加購:</p>
+                                                                    <ul className="list-disc list-inside pl-2">
+                                                                    {Object.entries(aggregatedOptions.addons).map(([name, {quantity, price}]) => (
+                                                                        <li key={name}>{name} x{quantity} (+${price * quantity})</li>
+                                                                    ))}
+                                                                    </ul>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
 
@@ -819,19 +865,8 @@
 
         const CartMainView = ({
             onClose, cartItems, onUpdateQuantity, onRemoveItem, onEditItem, customerInfo, 
-            setCustomerInfo, totalPrice, handleCheckout, isCheckingOut, orderType, setOrderType
+            onInfoChange, totalPrice, handleCheckout, isCheckingOut, orderType, setOrderType, validationError
         }) => {
-            const groupedItems = React.useMemo(() => {
-                return cartItems.reduce((acc, item) => {
-                    const category = item.categoryTitle || '其他';
-                    if (!acc[category]) {
-                        acc[category] = [];
-                    }
-                    acc[category].push(item);
-                    return acc;
-                }, {});
-            }, [cartItems]);
-
             const aggregatedOptions = React.useMemo(() => {
                 const drinks = {};
                 const sauces = {};
@@ -877,38 +912,34 @@
                     <>
                     <div className="flex-grow overflow-y-auto">
                       <div className="p-5 space-y-6">
-                        {Object.entries(groupedItems).map(([category, items]) => {
-                            const categoryTotalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
-                            return (
-                                <div key={category} className="bg-slate-50 rounded-lg p-4">
-                                    <h3 className="text-lg font-bold text-slate-700 mb-3 pb-2 border-b">{category}總計 x{categoryTotalQuantity}</h3>
-                                    <div className="space-y-4">
-                                    {items.map((item, index) => (
-                                      <div key={item.cartId} className="flex items-start gap-3">
-                                        <div className="pt-1 font-semibold text-slate-500">{index + 1}.</div>
-                                        <div className="flex-grow">
-                                          <p className="font-semibold">{item.item.name.replace(/半全餐|半套餐/g, '套餐')} <span className="font-normal text-slate-500">x{item.quantity}</span></p>
-                                          <div className="text-sm text-slate-600 mt-1 space-y-0.5">
-                                            {item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0 && <p>熟度: {Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}</p>}
-                                            {item.selectedNotes && <p className="text-blue-600">備註: {item.selectedNotes}</p>}
-                                          </div>
-                                        </div>
-                                        <div className="text-right flex flex-col items-end">
-                                          <p className="font-bold text-lg">${item.totalPrice}</p>
-                                          <div className="flex items-center gap-2 mt-3">
-                                            <button onClick={() => onEditItem(item.cartId)} className="text-slate-500 hover:text-blue-600"><PencilIcon className="h-5 w-5"/></button>
-                                            <button onClick={() => onUpdateQuantity(item.cartId, item.quantity - 1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon className="h-4 w-4" /></button>
-                                            <span className="font-semibold w-8 text-center">{item.quantity}</span>
-                                            <button onClick={() => onUpdateQuantity(item.cartId, item.quantity + 1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300"><PlusIcon className="h-4 w-4" /></button>
-                                            <button onClick={() => onRemoveItem(item.cartId)} className="text-red-500 hover:text-red-700 ml-1"><TrashIcon className="h-5 w-5"/></button>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    ))}
-                                    </div>
+                        <div className="bg-slate-50 rounded-lg p-4">
+                            <h3 className="text-lg font-bold text-slate-700 mb-3 pb-2 border-b">餐點列表</h3>
+                            <div className="space-y-4">
+                            {cartItems.map((item, index) => (
+                              <div key={item.cartId} className="flex items-start gap-3">
+                                <div className="pt-1 font-semibold text-slate-500">{index + 1}.</div>
+                                <div className="flex-grow">
+                                  <button onClick={() => onEditItem(item.cartId)} className="font-semibold text-left hover:text-blue-600 hover:underline transition-colors focus:outline-none">
+                                      {item.item.name.replace(/半全餐|半套餐/g, '套餐')} <span className="font-normal text-slate-500">x{item.quantity}</span>
+                                  </button>
+                                  <div className="text-sm text-slate-600 mt-1 space-y-0.5">
+                                    {item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0 && <p>熟度: {Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}</p>}
+                                    {item.selectedNotes && <p className="text-blue-600">備註: {item.selectedNotes}</p>}
+                                  </div>
                                 </div>
-                            )
-                        })}
+                                <div className="text-right flex flex-col items-end">
+                                  <p className="font-bold text-lg">${item.totalPrice}</p>
+                                  <div className="flex items-center gap-2 mt-3">
+                                    <button onClick={() => onUpdateQuantity(item.cartId, item.quantity - 1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon className="h-4 w-4" /></button>
+                                    <span className="font-semibold w-8 text-center">{item.quantity}</span>
+                                    <button onClick={() => onUpdateQuantity(item.cartId, item.quantity + 1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300"><PlusIcon className="h-4 w-4" /></button>
+                                    <button onClick={() => onRemoveItem(item.cartId)} className="text-red-500 hover:text-red-700 ml-1"><TrashIcon className="h-5 w-5"/></button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            </div>
+                        </div>
 
                         <div className="bg-slate-100 rounded-lg p-4 space-y-3">
                             <h3 className="text-md font-bold text-slate-600 border-b pb-2">訂單選項總覽</h3>
@@ -940,10 +971,10 @@
 
                         <h3 className="text-lg font-semibold mb-3 text-slate-700">顧客資訊</h3>
                         <div className="space-y-3">
-                          <input type="text" placeholder="姓名 *" value={customerInfo.name} onChange={(e) => setCustomerInfo(prev => ({ ...prev, name: e.target.value }))} className="w-full p-2 border border-slate-300 rounded-md" required />
-                          <input type="tel" placeholder="電話 * (10位數字)" value={customerInfo.phone} onChange={(e) => setCustomerInfo(prev => ({ ...prev, phone: e.target.value }))} className="w-full p-2 border border-slate-300 rounded-md" pattern="[0-9]{10}" required />
+                          <input type="text" placeholder="姓名 *" value={customerInfo.name} onChange={(e) => onInfoChange('name', e.target.value)} className="w-full p-2 border border-slate-300 rounded-md" required />
+                          <input type="tel" placeholder="電話 * (10位數字)" value={customerInfo.phone} onChange={(e) => onInfoChange('phone', e.target.value)} className="w-full p-2 border border-slate-300 rounded-md" pattern="[0-9]{10}" required />
                           {orderType === '內用' && (
-                            <input type="text" placeholder="桌號 (可選)" value={customerInfo.tableNumber} onChange={(e) => setCustomerInfo(prev => ({ ...prev, tableNumber: e.target.value }))} className="w-full p-2 border border-slate-300 rounded-md" />
+                            <input type="text" placeholder="桌號 (可選)" value={customerInfo.tableNumber} onChange={(e) => onInfoChange('tableNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded-md" />
                           )}
                         </div>
                       </div>
@@ -953,6 +984,11 @@
                         <span className="text-xl font-medium">總計</span>
                         <span className="text-3xl font-bold text-green-700">${totalPrice}</span>
                       </div>
+                      {validationError && (
+                          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 mb-3 rounded-md text-center" role="alert">
+                            <p className="font-bold">{validationError}</p>
+                          </div>
+                      )}
                       <button onClick={handleCheckout} disabled={isCheckingOut} className="w-full bg-green-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-green-700 transition-colors text-lg disabled:bg-slate-400 disabled:cursor-not-allowed">
                         {isCheckingOut ? "提交中..." : "確認訂單"}
                       </button>
@@ -969,6 +1005,8 @@
           const [orderType, setOrderType] = React.useState('內用');
           const [orderSubmitted, setOrderSubmitted] = React.useState(false);
           const [submittedOrderId, setSubmittedOrderId] = React.useState(null);
+          const [validationError, setValidationError] = React.useState(null);
+
 
           React.useEffect(() => {
             if (!isOpen) {
@@ -977,6 +1015,7 @@
                     setIsCheckingOut(false);
                     setSubmittedOrderId(null);
                     setOrderType('內用'); // Reset on close
+                    setValidationError(null);
                 }, 300);
             }
           }, [isOpen]);
@@ -986,16 +1025,28 @@
                   setCustomerInfo(prev => ({ ...prev, tableNumber: '' }));
               }
           }, [orderType]);
+          
+          const handleCustomerInfoChange = (field, value) => {
+              if (validationError) {
+                  setValidationError(null);
+              }
+              setCustomerInfo(prev => ({ ...prev, [field]: value }));
+          };
 
           const totalPrice = React.useMemo(() => cartItems.reduce((total, item) => total + item.totalPrice, 0), [cartItems]);
 
           const handleCheckout = async () => {
-            if (!customerInfo.name.trim() || !customerInfo.phone.trim()) {
-              alert('請填寫姓名和電話');
+            setValidationError(null);
+            if (!customerInfo.name.trim()) {
+              setValidationError('請填寫您的姓名');
+              return;
+            }
+             if (!customerInfo.phone.trim()) {
+              setValidationError('請填寫您的電話');
               return;
             }
             if (!/^[0-9]{10}$/.test(customerInfo.phone)) {
-                alert('請輸入有效的手機號碼（10位數字）');
+                setValidationError('請輸入有效的手機號碼（10位數字）');
                 return;
             }
 
@@ -1007,10 +1058,10 @@
                 setSubmittedOrderId(result.orderId);
                 setOrderSubmitted(true);
               } else {
-                alert('訂單提交失敗: ' + (result.message || '未知錯誤'));
+                setValidationError('訂單提交失敗: ' + (result.message || '未知錯誤'));
               }
             } catch (error) {
-              alert('訂單提交失敗: ' + error.message);
+              setValidationError('訂單提交失敗: ' + error.message);
             } finally {
               setIsCheckingOut(false);
             }
@@ -1033,12 +1084,13 @@
                         onRemoveItem={onRemoveItem}
                         onEditItem={onEditItem}
                         customerInfo={customerInfo}
-                        setCustomerInfo={setCustomerInfo}
+                        onInfoChange={handleCustomerInfoChange}
                         orderType={orderType}
                         setOrderType={setOrderType}
                         totalPrice={totalPrice}
                         handleCheckout={handleCheckout}
                         isCheckingOut={isCheckingOut}
+                        validationError={validationError}
                     />
                 }
               </div>
