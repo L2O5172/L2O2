@@ -145,51 +145,8 @@
             </svg>
         );
 
-        // 真實訂單數據
-        const REAL_ORDERS = [
-            {
-                id: 'ORD-1762084062954',
-                customerName: '123',
-                customerPhone: '987654321',
-                items: [
-                    { name: '香煎海盜牛排套餐', price: 299, quantity: 1 },
-                    { name: '美味豬排加購', price: 120, quantity: 1 },
-                    { name: '香煎鮮嫩鱸魚套餐', price: 320, quantity: 1 },
-                    { name: '海盜牛排加購', price: 200, quantity: 1 }
-                ],
-                totalAmount: 939,
-                status: 'confirmed',
-                createdAt: '2025-11-02T11:47:43.000Z',
-                orderType: '內用',
-                tableNumber: '',
-                notes: ''
-            },
-            {
-                id: 'ORD-1762090080319',
-                customerName: '123',
-                customerPhone: '987654321',
-                items: [
-                    { name: '香煎海盜牛排套餐', price: 399, quantity: 2 },
-                    { name: '鮮嫩鱸魚加購', price: 150, quantity: 1 },
-                    { name: '紐菲力加購', price: 250, quantity: 1 },
-                    { name: '老饕上蓋加購', price: 200, quantity: 1 },
-                    { name: '櫻桃鴨胸加購', price: 150, quantity: 1 },
-                    { name: '香煎鮮嫩雞腿套餐', price: 250, quantity: 2 },
-                    { name: '英式炸魚加購', price: 120, quantity: 1 },
-                    { name: '鮮嫩雞腿加購', price: 120, quantity: 1 },
-                    { name: '是日甜品加購', price: 30, quantity: 1 }
-                ],
-                totalAmount: 2318,
-                status: 'preparing',
-                createdAt: '2025-11-02T13:28:00.000Z',
-                orderType: '內用',
-                tableNumber: '',
-                notes: ''
-            }
-        ];
-
-        // API 服務 - 修復版本
-        const API_URL = 'https://script.google.com/macros/s/AKfycbx83vpj3iuB6rPorzWodu9pVw3UyMSzsfUBwQZe9a90ZSvWdZvr16D_uhIbjV3mpvvJ/exec';
+        // API 服務 - 使用您提供的部署 URL
+        const API_URL = 'https://script.google.com/macros/s/AKfycbzjaQetvgEgkXfcahjL4iqnaWvUuHAJ1NJZRKlsLOA-QjTOq9GGJlK2tf-QJKuSjvtVsQ/exec';
 
         const apiService = {
           async getOrders() {
@@ -201,16 +158,15 @@
               const data = await response.json();
               console.log('API Response:', data);
               
-              // 如果API返回成功但沒有orders數據，使用真實數據
-              if (data.success && (!data.orders || data.orders.length === 0)) {
-                console.log('No orders from API, using real data...');
-                return { success: true, orders: REAL_ORDERS };
+              if (data.success && data.orders) {
+                return { success: true, orders: data.orders };
+              } else {
+                throw new Error(data.message || '獲取訂單數據失敗');
               }
               
-              return data;
             } catch (error) {
-              console.warn("API fetch failed, using real data.", error);
-              return { success: true, orders: REAL_ORDERS };
+              console.warn("API fetch failed:", error);
+              return { success: false, message: error.message, orders: [] };
             }
           },
 
@@ -244,17 +200,12 @@
                     const result = JSON.parse(responseText);
                     return result;
                 } catch (e) {
-                    // 如果解析失敗，檢查是否為成功消息
-                    if (responseText.includes('success') || responseText.includes('成功')) {
-                        return { success: true, message: '狀態更新成功' };
-                    }
                     throw new Error(`Received an invalid response from the server: ${responseText}`);
                 }
 
             } catch (error) {
                 console.error("Failed to update order status:", error);
-                // 模擬成功響應
-                return { success: true, message: '訂單狀態更新成功 (模擬)' };
+                throw error;
             }
           }
         };
@@ -386,14 +337,14 @@
                             <h4 className="font-semibold mb-2">訂單內容:</h4>
                             <div className="bg-gray-50 rounded-lg p-3">
                                 <div className="space-y-2">
-                                    {order.items.map((item, index) => (
+                                    {order.items && order.items.map((item, index) => (
                                         <div key={index} className="flex justify-between text-sm">
                                             <span className="flex-1">
                                                 {item.name} 
                                                 <span className="text-gray-500 ml-2">x{item.quantity}</span>
                                             </span>
                                             <span className="ml-4">
-                                                ${item.price * item.quantity}
+                                                ${(item.price * item.quantity).toLocaleString()}
                                             </span>
                                         </div>
                                     ))}
@@ -401,7 +352,7 @@
                                 <div className="border-t mt-2 pt-2 font-bold">
                                     <div className="flex justify-between">
                                         <span>總金額:</span>
-                                        <span>${order.totalAmount}</span>
+                                        <span>${order.totalAmount ? order.totalAmount.toLocaleString() : '0'}</span>
                                     </div>
                                 </div>
                             </div>
@@ -409,13 +360,13 @@
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm mb-4">
                             <div>
-                                <p><strong>訂單類型:</strong> {order.orderType}</p>
+                                <p><strong>訂單類型:</strong> {order.orderType || '未指定'}</p>
                                 {order.tableNumber && (
                                     <p><strong>桌號:</strong> {order.tableNumber}</p>
                                 )}
                             </div>
                             <div>
-                                <p><strong>總金額:</strong> <span className="text-green-600 font-bold">${order.totalAmount}</span></p>
+                                <p><strong>總金額:</strong> <span className="text-green-600 font-bold">${order.totalAmount ? order.totalAmount.toLocaleString() : '0'}</span></p>
                                 {order.notes && (
                                     <p className="break-words"><strong>顧客備註:</strong> {order.notes}</p>
                                 )}
@@ -478,6 +429,7 @@
             const filteredOrders = useMemo(() => {
                 const { start, end } = getDateRange;
                 return orders.filter(order => {
+                    if (!order.createdAt) return false;
                     const orderDate = new Date(order.createdAt);
                     return orderDate >= start && orderDate <= end && order.status !== 'cancelled';
                 });
@@ -486,7 +438,7 @@
             // 計算統計數據
             const statistics = useMemo(() => {
                 // 營業額統計
-                const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+                const totalRevenue = filteredOrders.reduce((sum, order) => sum + (order.totalAmount || 0), 0);
 
                 // 客數統計
                 const customerCount = filteredOrders.length;
@@ -494,14 +446,16 @@
                 // 熱門商品統計
                 const itemSales = {};
                 filteredOrders.forEach(order => {
-                    order.items.forEach(item => {
-                        const itemName = item.name;
-                        if (!itemSales[itemName]) {
-                            itemSales[itemName] = { quantity: 0, revenue: 0 };
-                        }
-                        itemSales[itemName].quantity += item.quantity;
-                        itemSales[itemName].revenue += item.price * item.quantity;
-                    });
+                    if (order.items) {
+                        order.items.forEach(item => {
+                            const itemName = item.name;
+                            if (!itemSales[itemName]) {
+                                itemSales[itemName] = { quantity: 0, revenue: 0 };
+                            }
+                            itemSales[itemName].quantity += item.quantity || 0;
+                            itemSales[itemName].revenue += (item.price || 0) * (item.quantity || 0);
+                        });
+                    }
                 });
 
                 // 轉換為陣列並排序
@@ -512,13 +466,15 @@
                 // 每日數據
                 const dailyData = {};
                 filteredOrders.forEach(order => {
-                    const date = new Date(order.createdAt).toLocaleDateString('zh-TW');
-                    if (!dailyData[date]) {
-                        dailyData[date] = { revenue: 0, customers: 0, orders: 0 };
+                    if (order.createdAt) {
+                        const date = new Date(order.createdAt).toLocaleDateString('zh-TW');
+                        if (!dailyData[date]) {
+                            dailyData[date] = { revenue: 0, customers: 0, orders: 0 };
+                        }
+                        dailyData[date].revenue += order.totalAmount || 0;
+                        dailyData[date].customers += 1;
+                        dailyData[date].orders += 1;
                     }
-                    dailyData[date].revenue += order.totalAmount;
-                    dailyData[date].customers += 1;
-                    dailyData[date].orders += 1;
                 });
 
                 return {
@@ -796,364 +752,4 @@
                                         <td className="border border-gray-200 p-3 text-center">
                                             {statistics.popularItems.reduce((sum, item) => sum + item.quantity, 0)}
                                         </td>
-                                        <td className="border border-gray-200 p-3 text-right">${statistics.totalRevenue.toLocaleString()}</td>
-                                        <td className="border border-gray-200 p-3 text-right">100%</td>
-                                    </tr>
-                                </tfoot>
-                            </table>
-                        </div>
-                    </div>
-
-                    {/* 累計數據 */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                        <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-                            <h3 className="text-lg font-bold mb-4">每日累計營業額</h3>
-                            <div className="space-y-2 max-h-60 overflow-y-auto">
-                                {Object.entries(statistics.dailyData)
-                                    .sort(([a], [b]) => new Date(b) - new Date(a))
-                                    .map(([date, data]) => (
-                                        <div key={date} className="flex justify-between items-center py-2 border-b border-gray-100">
-                                            <span className="font-medium">{date}</span>
-                                            <span className="text-green-600 font-bold">${data.revenue.toLocaleString()}</span>
-                                        </div>
-                                    ))
-                                }
-                            </div>
-                        </div>
-
-                        <div className="bg-white rounded-lg p-6 border border-gray-200 shadow-sm">
-                            <h3 className="text-lg font-bold mb-4">每日累計客數</h3>
-                            <div className="space-y-2 max-h-60 overflow-y-auto">
-                                {Object.entries(statistics.dailyData)
-                                    .sort(([a], [b]) => new Date(b) - new Date(a))
-                                    .map(([date, data]) => (
-                                        <div key={date} className="flex justify-between items-center py-2 border-b border-gray-100">
-                                            <span className="font-medium">{date}</span>
-                                            <span className="text-blue-600 font-bold">{data.customers} 人</span>
-                                        </div>
-                                    ))
-                                }
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            );
-        };
-
-        // 主應用組件
-        const App = () => {
-            const [orders, setOrders] = useState([]);
-            const [filteredOrders, setFilteredOrders] = useState([]);
-            const [isLoading, setIsLoading] = useState(true);
-            const [isRefreshing, setIsRefreshing] = useState(false);
-            const [notification, setNotification] = useState({ message: '', type: 'success', visible: false });
-            const [statusFilter, setStatusFilter] = useState('all');
-            const [currentView, setCurrentView] = useState('orders');
-
-            // 顯示通知
-            const showNotification = (message, type = 'success') => {
-                setNotification({ message, type, visible: true });
-                setTimeout(() => {
-                    setNotification(prev => ({ ...prev, visible: false }));
-                }, 5000);
-            };
-
-            // 載入訂單
-            const loadOrders = async () => {
-                try {
-                    const result = await apiService.getOrders();
-                    if (result.success) {
-                        setOrders(result.orders);
-                        applyFilters(result.orders, statusFilter);
-                        showNotification(`成功載入 ${result.orders.length} 筆訂單`, 'success');
-                    } else {
-                        throw new Error(result.message || '載入訂單失敗');
-                    }
-                } catch (error) {
-                    console.error('載入訂單失敗:', error);
-                    showNotification('載入訂單失敗: ' + error.message, 'error');
-                    // 使用真實數據作為備用
-                    setOrders(REAL_ORDERS);
-                    applyFilters(REAL_ORDERS, statusFilter);
-                } finally {
-                    setIsLoading(false);
-                    setIsRefreshing(false);
-                }
-            };
-
-            // 套用篩選
-            const applyFilters = (ordersList, filter) => {
-                if (filter === 'all') {
-                    setFilteredOrders(ordersList);
-                } else {
-                    setFilteredOrders(ordersList.filter(order => order.status === filter));
-                }
-            };
-
-            // 更新訂單狀態
-            const handleStatusUpdate = async (orderId, status) => {
-                try {
-                    const result = await apiService.updateOrderStatus(orderId, status);
-                    if (result.success) {
-                        await loadOrders();
-                        showNotification('訂單狀態已更新', 'success');
-                    } else {
-                        throw new Error(result.message || '更新狀態失敗');
-                    }
-                } catch (error) {
-                    console.error('更新狀態失敗:', error);
-                    showNotification('更新狀態失敗: ' + error.message, 'error');
-                    throw error;
-                }
-            };
-
-            // 列印訂單
-            const handlePrintOrder = (order) => {
-                const printWindow = window.open('', '_blank');
-                const printContent = `
-                    <!DOCTYPE html>
-                    <html>
-                    <head>
-                        <title>訂單列印 - ${order.id}</title>
-                        <style>
-                            body { font-family: Arial, sans-serif; margin: 20px; }
-                            .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #333; padding-bottom: 10px; }
-                            .order-info { margin-bottom: 15px; }
-                            .items-table { width: 100%; border-collapse: collapse; margin: 15px 0; }
-                            .items-table th, .items-table td { border: 1px solid #ddd; padding: 8px; text-align: left; }
-                            .items-table th { background-color: #f5f5f5; }
-                            .total { font-weight: bold; text-align: right; font-size: 1.1em; margin-top: 10px; }
-                            .notes { margin-top: 15px; padding: 10px; background-color: #f9f9f9; border-radius: 4px; }
-                            .status { display: inline-block; padding: 4px 8px; border-radius: 4px; font-weight: bold; }
-                            .status-confirmed { background-color: #d4edda; color: #155724; }
-                            .status-preparing { background-color: #cce7ff; color: #004085; }
-                            .status-ready { background-color: #e2e3ff; color: #383d41; }
-                            .status-completed { background-color: #d1ecf1; color: #0c5460; }
-                            @media print {
-                                body { margin: 0; }
-                                .no-print { display: none; }
-                            }
-                        </style>
-                    </head>
-                    <body>
-                        <div class="header">
-                            <h1>美味廚房</h1>
-                            <h2>訂單明細</h2>
-                        </div>
-                        
-                        <div class="order-info">
-                            <p><strong>訂單編號:</strong> ${order.id}</p>
-                            <p><strong>顧客姓名:</strong> ${order.customerName}</p>
-                            <p><strong>顧客電話:</strong> ${order.customerPhone}</p>
-                            <p><strong>訂單狀態:</strong> 
-                                <span class="status status-${order.status}">
-                                    ${order.status === 'confirmed' ? '已確認' : 
-                                      order.status === 'preparing' ? '製作中' : 
-                                      order.status === 'ready' ? '可取餐' : 
-                                      order.status === 'completed' ? '已完成' : 
-                                      order.status === 'cancelled' ? '已取消' : '待確認'}
-                                </span>
-                            </p>
-                            <p><strong>下單時間:</strong> ${new Date(order.createdAt).toLocaleString('zh-TW')}</p>
-                            <p><strong>訂單類型:</strong> ${order.orderType}</p>
-                            ${order.tableNumber ? `<p><strong>桌號:</strong> ${order.tableNumber}</p>` : ''}
-                        </div>
-
-                        <table class="items-table">
-                            <thead>
-                                <tr>
-                                    <th>商品名稱</th>
-                                    <th>單價</th>
-                                    <th>數量</th>
-                                    <th>小計</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${order.items.map(item => `
-                                    <tr>
-                                        <td>${item.name}</td>
-                                        <td>$${item.price}</td>
-                                        <td>${item.quantity}</td>
-                                        <td>$${item.price * item.quantity}</td>
-                                    </tr>
-                                `).join('')}
-                            </tbody>
-                        </table>
-
-                        <div class="total">
-                            總金額: $${order.totalAmount}
-                        </div>
-
-                        ${order.notes ? `
-                            <div class="notes">
-                                <strong>顧客備註:</strong> ${order.notes}
-                            </div>
-                        ` : ''}
-
-                        <div class="no-print" style="margin-top: 20px; text-align: center;">
-                            <button onclick="window.print()" style="padding: 10px 20px; background: #007bff; color: white; border: none; border-radius: 4px; cursor: pointer;">
-                                列印訂單
-                            </button>
-                            <button onclick="window.close()" style="padding: 10px 20px; background: #6c757d; color: white; border: none; border-radius: 4px; cursor: pointer; margin-left: 10px;">
-                                關閉視窗
-                            </button>
-                        </div>
-                    </body>
-                    </html>
-                `;
-                
-                printWindow.document.write(printContent);
-                printWindow.document.close();
-            };
-
-            // 刷新訂單
-            const handleRefresh = () => {
-                setIsRefreshing(true);
-                loadOrders();
-            };
-
-            // 處理篩選變更
-            const handleFilterChange = (filter) => {
-                setStatusFilter(filter);
-                applyFilters(orders, filter);
-            };
-
-            // 初始化載入
-            useEffect(() => {
-                loadOrders();
-            }, []);
-
-            // 訂單統計
-            const orderStats = useMemo(() => {
-                const stats = {
-                    all: orders.length,
-                    pending: orders.filter(order => order.status === 'pending').length,
-                    confirmed: orders.filter(order => order.status === 'confirmed').length,
-                    preparing: orders.filter(order => order.status === 'preparing').length,
-                    ready: orders.filter(order => order.status === 'ready').length,
-                    completed: orders.filter(order => order.status === 'completed').length,
-                    cancelled: orders.filter(order => order.status === 'cancelled').length
-                };
-                return stats;
-            }, [orders]);
-
-            if (isLoading) {
-                return (
-                    <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-                        <div className="text-center">
-                            <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-green-700"></div>
-                            <p className="mt-4 text-gray-600">載入訂單中...</p>
-                        </div>
-                    </div>
-                );
-            }
-
-            return (
-                <div className="min-h-screen bg-gray-50">
-                    {/* 通知組件 */}
-                    <Notification
-                        message={notification.message}
-                        type={notification.type}
-                        visible={notification.visible}
-                        onClose={() => setNotification(prev => ({ ...prev, visible: false }))}
-                    />
-
-                    {/* 頂部導航 */}
-                    <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
-                        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-                            <div className="flex justify-between items-center h-16">
-                                <div className="flex items-center">
-                                    <h1 className="text-2xl font-bold text-gray-900">美味廚房店家管理系統</h1>
-                                </div>
-                                <div className="flex items-center gap-4">
-                                    <button
-                                        onClick={handleRefresh}
-                                        disabled={isRefreshing}
-                                        className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                                    >
-                                        {isRefreshing ? <LoadingSpinner /> : <RefreshIcon className="h-5 w-5" />}
-                                        刷新訂單
-                                    </button>
-                                    <button
-                                        onClick={() => setCurrentView(currentView === 'orders' ? 'statistics' : 'orders')}
-                                        className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
-                                    >
-                                        <ChartIcon className="h-5 w-5" />
-                                        {currentView === 'orders' ? '查看統計' : '查看訂單'}
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    </header>
-
-                    {/* 主內容區域 */}
-                    <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                        {currentView === 'orders' ? (
-                            <>
-                                {/* 訂單統計 */}
-                                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4 mb-8">
-                                    {[
-                                        { key: 'all', label: '全部', color: 'gray' },
-                                        { key: 'pending', label: '待確認', color: 'yellow' },
-                                        { key: 'confirmed', label: '已確認', color: 'blue' },
-                                        { key: 'preparing', label: '製作中', color: 'indigo' },
-                                        { key: 'ready', label: '可取餐', color: 'purple' },
-                                        { key: 'completed', label: '已完成', color: 'green' },
-                                        { key: 'cancelled', label: '已取消', color: 'red' }
-                                    ].map(({ key, label, color }) => (
-                                        <button
-                                            key={key}
-                                            onClick={() => handleFilterChange(key)}
-                                            className={`p-4 rounded-lg text-center transition-all ${
-                                                statusFilter === key
-                                                    ? `bg-${color}-500 text-white shadow-lg transform scale-105`
-                                                    : `bg-white text-gray-700 border border-${color}-200 hover:border-${color}-300 hover:shadow-md`
-                                            }`}
-                                        >
-                                            <div className="text-2xl font-bold">{orderStats[key]}</div>
-                                            <div className="text-sm">{label}</div>
-                                        </button>
-                                    ))}
-                                </div>
-
-                                {/* 訂單列表 */}
-                                <div className="space-y-6">
-                                    {filteredOrders.length === 0 ? (
-                                        <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-                                            <div className="text-6xl mb-4">📭</div>
-                                            <h3 className="text-xl font-semibold text-gray-600 mb-2">暫無訂單</h3>
-                                            <p className="text-gray-500">目前沒有符合條件的訂單</p>
-                                        </div>
-                                    ) : (
-                                        filteredOrders.map(order => (
-                                            <OrderCard
-                                                key={order.id}
-                                                order={order}
-                                                onStatusUpdate={handleStatusUpdate}
-                                                onPrint={handlePrintOrder}
-                                            />
-                                        ))
-                                    )}
-                                </div>
-                            </>
-                        ) : (
-                            <SalesStatistics 
-                                orders={orders} 
-                                currentView={currentView}
-                                onViewChange={setCurrentView}
-                            />
-                        )}
-                    </main>
-                </div>
-            );
-        };
-
-        // 渲染應用
-        ReactDOM.render(<App />, document.getElementById('root'));
-    </script>
-    
-    <script src="https://unpkg.com/react@17/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@17/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-</body>
-</html>
+                                        <td className="border border-gray-200 p-3 text-right">${statistics.total
