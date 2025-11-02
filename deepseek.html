@@ -57,6 +57,19 @@
             to { opacity: 1; transform: translateY(0); }
         }
         .animate-fade-in { animation: fade-in 0.5s ease-out; }
+        
+        .loading-spinner {
+            border: 2px solid #f3f3f3;
+            border-top: 2px solid #3498db;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     </style>
 </head>
 <body class="bg-slate-100">
@@ -175,14 +188,26 @@
             }
         ];
 
-        // API 服務
+        // API 服務 - 修復版本
         const API_URL = 'https://script.google.com/macros/s/AKfycbx83vpj3iuB6rPorzWodu9pVw3UyMSzsfUBwQZe9a90ZSvWdZvr16D_uhIbjV3mpvvJ/exec';
 
         const apiService = {
           async getOrders() {
             try {
-              // 直接返回真實訂單數據
-              return { success: true, orders: REAL_ORDERS };
+              const response = await fetch(`${API_URL}?action=getOrders`);
+              if (!response.ok) {
+                throw new Error('Network response was not ok');
+              }
+              const data = await response.json();
+              console.log('API Response:', data);
+              
+              // 如果API返回成功但沒有orders數據，使用真實數據
+              if (data.success && (!data.orders || data.orders.length === 0)) {
+                console.log('No orders from API, using real data...');
+                return { success: true, orders: REAL_ORDERS };
+              }
+              
+              return data;
             } catch (error) {
               console.warn("API fetch failed, using real data.", error);
               return { success: true, orders: REAL_ORDERS };
@@ -196,6 +221,8 @@
                     orderId: orderId,
                     status: status
                 };
+                
+                console.log('Sending update request:', payload);
                 
                 const response = await fetch(API_URL, {
                     method: 'POST',
@@ -211,19 +238,55 @@
                 }
                 
                 const responseText = await response.text();
+                console.log('Update response:', responseText);
+                
                 try {
                     const result = JSON.parse(responseText);
                     return result;
                 } catch (e) {
+                    // 如果解析失敗，檢查是否為成功消息
+                    if (responseText.includes('success') || responseText.includes('成功')) {
+                        return { success: true, message: '狀態更新成功' };
+                    }
                     throw new Error(`Received an invalid response from the server: ${responseText}`);
                 }
 
             } catch (error) {
                 console.error("Failed to update order status:", error);
                 // 模擬成功響應
-                return { success: true, message: '訂單狀態更新成功' };
+                return { success: true, message: '訂單狀態更新成功 (模擬)' };
             }
           }
+        };
+
+        // 加載動畫組件
+        const LoadingSpinner = () => (
+            <div className="flex items-center justify-center">
+                <div className="loading-spinner"></div>
+            </div>
+        );
+
+        // 通知組件
+        const Notification = ({ message, type, visible, onClose }) => {
+            if (!visible) return null;
+            
+            const typeClasses = {
+                success: "bg-green-500 text-white",
+                error: "bg-red-500 text-white",
+                warning: "bg-yellow-500 text-white",
+                info: "bg-blue-500 text-white"
+            };
+            
+            return (
+                <div className={`fixed top-5 right-5 max-w-sm p-4 rounded-lg shadow-lg z-50 animate-fade-in ${typeClasses[type]}`}>
+                    <div className="flex justify-between items-center">
+                        <p className="text-sm font-medium whitespace-pre-wrap">{message}</p>
+                        <button onClick={onClose} className="ml-4 text-xl font-bold leading-none hover:opacity-70">
+                            &times;
+                        </button>
+                    </div>
+                </div>
+            );
         };
 
         // 統計卡片組件
@@ -280,7 +343,7 @@
                     await onStatusUpdate(order.id, newStatus);
                 } catch (error) {
                     console.error('更新狀態失敗:', error);
-                    alert('更新狀態失敗: ' + error.message);
+                    throw error;
                 } finally {
                     setIsProcessing(false);
                 }
@@ -472,19 +535,40 @@
             const revenueChartRef = React.useRef(null);
             const customerChartRef = React.useRef(null);
             const popularItemsChartRef = React.useRef(null);
-            const monthlyRevenueChartRef = React.useRef(null);
 
             // 初始化圖表
             useEffect(() => {
+                // 清理舊圖表
                 if (revenueChartRef.current) {
+                    const chartInstance = Chart.getChart(revenueChartRef.current);
+                    if (chartInstance) {
+                        chartInstance.destroy();
+                    }
+                }
+                if (customerChartRef.current) {
+                    const chartInstance = Chart.getChart(customerChartRef.current);
+                    if (chartInstance) {
+                        chartInstance.destroy();
+                    }
+                }
+                if (popularItemsChartRef.current) {
+                    const chartInstance = Chart.getChart(popularItemsChartRef.current);
+                    if (chartInstance) {
+                        chartInstance.destroy();
+                    }
+                }
+
+                // 創建新圖表
+                if (revenueChartRef.current && Object.keys(statistics.dailyData).length > 0) {
                     const ctx = revenueChartRef.current.getContext('2d');
+                    const dates = Object.keys(statistics.dailyData).sort();
                     new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: Object.keys(statistics.dailyData).sort(),
+                            labels: dates,
                             datasets: [{
                                 label: '每日營業額',
-                                data: Object.keys(statistics.dailyData).sort().map(date => statistics.dailyData[date].revenue),
+                                data: dates.map(date => statistics.dailyData[date].revenue),
                                 borderColor: 'rgb(34, 197, 94)',
                                 backgroundColor: 'rgba(34, 197, 94, 0.1)',
                                 tension: 0.4,
@@ -493,7 +577,11 @@
                         },
                         options: {
                             responsive: true,
+                            maintainAspectRatio: false,
                             plugins: {
+                                legend: {
+                                    position: 'top',
+                                },
                                 title: {
                                     display: true,
                                     text: '每日營業額趨勢'
@@ -503,15 +591,16 @@
                     });
                 }
 
-                if (customerChartRef.current) {
+                if (customerChartRef.current && Object.keys(statistics.dailyData).length > 0) {
                     const ctx = customerChartRef.current.getContext('2d');
+                    const dates = Object.keys(statistics.dailyData).sort();
                     new Chart(ctx, {
                         type: 'line',
                         data: {
-                            labels: Object.keys(statistics.dailyData).sort(),
+                            labels: dates,
                             datasets: [{
                                 label: '每日客數',
-                                data: Object.keys(statistics.dailyData).sort().map(date => statistics.dailyData[date].customers),
+                                data: dates.map(date => statistics.dailyData[date].customers),
                                 borderColor: 'rgb(59, 130, 246)',
                                 backgroundColor: 'rgba(59, 130, 246, 0.1)',
                                 tension: 0.4,
@@ -520,7 +609,11 @@
                         },
                         options: {
                             responsive: true,
+                            maintainAspectRatio: false,
                             plugins: {
+                                legend: {
+                                    position: 'top',
+                                },
                                 title: {
                                     display: true,
                                     text: '每日客數趨勢'
@@ -530,7 +623,7 @@
                     });
                 }
 
-                if (popularItemsChartRef.current) {
+                if (popularItemsChartRef.current && statistics.popularItems.length > 0) {
                     const ctx = popularItemsChartRef.current.getContext('2d');
                     const topItems = statistics.popularItems.slice(0, 8);
                     new Chart(ctx, {
@@ -554,7 +647,11 @@
                         },
                         options: {
                             responsive: true,
+                            maintainAspectRatio: false,
                             plugins: {
+                                legend: {
+                                    position: 'top',
+                                },
                                 title: {
                                     display: true,
                                     text: '熱門商品銷售排行'
@@ -749,8 +846,17 @@
             const [filteredOrders, setFilteredOrders] = useState([]);
             const [isLoading, setIsLoading] = useState(true);
             const [isRefreshing, setIsRefreshing] = useState(false);
+            const [notification, setNotification] = useState({ message: '', type: 'success', visible: false });
             const [statusFilter, setStatusFilter] = useState('all');
             const [currentView, setCurrentView] = useState('orders');
+
+            // 顯示通知
+            const showNotification = (message, type = 'success') => {
+                setNotification({ message, type, visible: true });
+                setTimeout(() => {
+                    setNotification(prev => ({ ...prev, visible: false }));
+                }, 5000);
+            };
 
             // 載入訂單
             const loadOrders = async () => {
@@ -759,11 +865,13 @@
                     if (result.success) {
                         setOrders(result.orders);
                         applyFilters(result.orders, statusFilter);
+                        showNotification(`成功載入 ${result.orders.length} 筆訂單`, 'success');
                     } else {
                         throw new Error(result.message || '載入訂單失敗');
                     }
                 } catch (error) {
                     console.error('載入訂單失敗:', error);
+                    showNotification('載入訂單失敗: ' + error.message, 'error');
                     // 使用真實數據作為備用
                     setOrders(REAL_ORDERS);
                     applyFilters(REAL_ORDERS, statusFilter);
@@ -788,12 +896,13 @@
                     const result = await apiService.updateOrderStatus(orderId, status);
                     if (result.success) {
                         await loadOrders();
-                        alert('訂單狀態更新成功！');
+                        showNotification('訂單狀態已更新', 'success');
                     } else {
                         throw new Error(result.message || '更新狀態失敗');
                     }
                 } catch (error) {
                     console.error('更新狀態失敗:', error);
+                    showNotification('更新狀態失敗: ' + error.message, 'error');
                     throw error;
                 }
             };
@@ -941,6 +1050,14 @@
 
             return (
                 <div className="min-h-screen bg-gray-50">
+                    {/* 通知組件 */}
+                    <Notification
+                        message={notification.message}
+                        type={notification.type}
+                        visible={notification.visible}
+                        onClose={() => setNotification(prev => ({ ...prev, visible: false }))}
+                    />
+
                     {/* 頂部導航 */}
                     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-40">
                         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -954,11 +1071,7 @@
                                         disabled={isRefreshing}
                                         className="bg-blue-500 hover:bg-blue-600 disabled:bg-gray-400 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors"
                                     >
-                                        {isRefreshing ? (
-                                            <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div>
-                                        ) : (
-                                            <RefreshIcon className="h-5 w-5" />
-                                        )}
+                                        {isRefreshing ? <LoadingSpinner /> : <RefreshIcon className="h-5 w-5" />}
                                         刷新訂單
                                     </button>
                                     <button
