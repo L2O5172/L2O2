@@ -705,24 +705,39 @@
         };
 
         // From components/Cart.tsx
-        const CartSuccessView = ({ handleNewOrder, orderId }) => {
-            const [isLoading, setIsLoading] = React.useState(true);
+        const CartSuccessView = ({ handleNewOrder, orderId, orderData }) => {
             const [orderDetails, setOrderDetails] = React.useState(null);
             const printRef = React.useRef(null);
 
             React.useEffect(() => {
-                if (orderId) {
-                    const fetchDetails = async () => {
-                        setIsLoading(true);
+                if (orderId && orderData) {
+                    // Immediately build the details object so the UI can render.
+                    // Assume 'Pending' status until we hear back from the server.
+                    const initialDetails = {
+                        id: orderId,
+                        status: '待處理',
+                        orderType: orderData.orderType,
+                        items: orderData.items,
+                        totalAmount: orderData.totalPrice
+                    };
+                    setOrderDetails(initialDetails);
+            
+                    const fetchStatus = async () => {
                         const result = await apiService.getOrderStatus(orderId);
-                        if (result.success) {
-                            setOrderDetails(result.order);
+                        if (result.success && result.order.status) {
+                            // Update the state with the real status
+                            setOrderDetails(prevDetails => ({
+                                ...prevDetails,
+                                status: result.order.status
+                            }));
                         }
-                        setIsLoading(false);
-                    }
-                    fetchDetails();
+                        // If it fails, we just stick with '待處理'
+                    };
+                    fetchStatus();
+                } else {
+                    setOrderDetails(null);
                 }
-            }, [orderId]);
+            }, [orderId, orderData]);
             
             const aggregatedOptions = React.useMemo(() => {
                 if (!orderDetails || !orderDetails.items) return { drinks: {}, sauces: {}, addons: {} };
@@ -780,10 +795,8 @@
                         </div>
                         <h3 className="text-2xl font-bold text-slate-800 mb-2">訂單提交成功!</h3>
                         <p className="text-slate-500 mb-4">我們會盡快為您準備餐點。</p>
-                        
-                        {isLoading && <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-700 my-4"></div>}
-                        
-                        {orderDetails && (
+                                                
+                        {!orderDetails ? <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-700 my-4"></div> : (
                             <div className="w-full text-left">
                                 <div ref={printRef} className="print-area w-full bg-slate-50 p-4 rounded-lg mb-4 border space-y-2">
                                     <div className="print-container">
@@ -1005,6 +1018,7 @@
           const [orderType, setOrderType] = React.useState('內用');
           const [orderSubmitted, setOrderSubmitted] = React.useState(false);
           const [submittedOrderId, setSubmittedOrderId] = React.useState(null);
+          const [submittedOrderData, setSubmittedOrderData] = React.useState(null);
           const [validationError, setValidationError] = React.useState(null);
 
 
@@ -1014,6 +1028,7 @@
                     setOrderSubmitted(false);
                     setIsCheckingOut(false);
                     setSubmittedOrderId(null);
+                    setSubmittedOrderData(null);
                     setOrderType('內用'); // Reset on close
                     setValidationError(null);
                 }, 300);
@@ -1056,6 +1071,7 @@
               const result = await onSubmitOrder(orderData);
               if (result.success && result.orderId) {
                 setSubmittedOrderId(result.orderId);
+                setSubmittedOrderData(orderData);
                 setOrderSubmitted(true);
               } else {
                 setValidationError('訂單提交失敗: ' + (result.message || '未知錯誤'));
@@ -1076,7 +1092,11 @@
               <div className={`fixed inset-0 bg-black bg-opacity-50 z-30 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
               <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-lg z-40 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
                 {orderSubmitted ? 
-                    <CartSuccessView handleNewOrder={handleNewOrder} orderId={submittedOrderId} /> : 
+                    <CartSuccessView 
+                        handleNewOrder={handleNewOrder} 
+                        orderId={submittedOrderId} 
+                        orderData={submittedOrderData}
+                    /> : 
                     <CartMainView 
                         onClose={onClose}
                         cartItems={cartItems}
