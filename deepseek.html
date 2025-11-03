@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <title>美味廚房店家管理系統</title>
+    <title>美味廚房點餐與管理系統</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -38,14 +38,32 @@
             }
         }
         .sidebar {
-            transition: all 0.3s ease;
+            transition: transform 0.3s ease;
         }
         @media (max-width: 768px) {
             .sidebar {
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh;
+                z-index: 40;
                 transform: translateX(-100%);
             }
             .sidebar.open {
                 transform: translateX(0);
+            }
+            .overlay {
+                display: none;
+                position: fixed;
+                top: 0;
+                left: 0;
+                right: 0;
+                bottom: 0;
+                background-color: rgba(0, 0, 0, 0.5);
+                z-index: 30;
+            }
+            .overlay.open {
+                display: block;
             }
         }
     </style>
@@ -66,30 +84,178 @@
         import React from 'react';
         import ReactDOM from 'react-dom/client';
 
-        // API 服務
+        // From constants.ts
+        const Doneness = {
+          Three: '3分熟',
+          Five: '5分熟',
+          Seven: '7分熟',
+          WellDone: '全熟',
+        };
+
+        const MENU_DATA = [
+          {
+            title: "套餐",
+            description: "附: ①日湯 ②麵包 ③主餐 ④脆薯 ⑤飲料",
+            items: [
+              { id: 'set-1', name: '香煎海盜牛排套餐', weight: '7oz', price: 299, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'set-2', name: '香煎海盜牛排套餐', weight: '14oz', price: 399, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'set-3', name: '香煎海盜牛排套餐', weight: '21oz', price: 499, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'set-4', name: '香煎特選板腱套餐', weight: '10oz', price: 399, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'set-5', name: '香煎老饕上蓋套餐', weight: '7oz', price: 399, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'set-6', name: '香煎紐菲力套餐', weight: '7oz', price: 499, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'set-7', name: '香煎櫻桃鴨胸套餐', weight: '10oz', price: 320, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'set-8', name: '香煎鮮嫩鱸魚套餐', weight: '10oz', price: 320, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'set-9', name: '香煎鮮嫩雞腿套餐', weight: '10oz', price: 250, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'set-10', name: '香煎美味豬排套餐', weight: '10oz', price: 299, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'set-11', name: '英式炸魚套餐', weight: '10oz', price: 250, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'set-12', name: '日式豬排套餐', weight: '10oz', price: 250, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: false },
+            ]
+          },
+          {
+            title: "組合餐",
+            description: "附: ①日湯 ②麵包 ③主餐 ④脆薯 ⑤沙拉 ⑥飲料",
+            items: [
+              { id: 'combo-1', name: '日豬、雞腿、上蓋組合餐', weight: '15oz', price: 529, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'combo-2', name: '炸魚、雞腿、板腱組合餐', weight: '15oz', price: 529, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'combo-3', name: '鱸魚、鴨胸、豬排組合餐', weight: '15oz', price: 529, customizations: { doneness: false, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'combo-4', name: '鴨胸、鱸魚、上蓋組合餐', weight: '15oz', price: 599, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+              { id: 'combo-5', name: 'N菲、上蓋、板腱組合餐', weight: '15oz', price: 699, customizations: { doneness: true, sauceChoice: true, drinkChoice: true, notes: true }, isAvailable: true },
+            ]
+          }
+        ];
+
+        const ADDONS = [
+            { id: 'addon-pirate-steak-5oz', name: '海盜牛排 5oz 加購', price: 200, category: '主餐加購', isAvailable: true },
+            { id: 'addon-top-blade-5oz', name: '特選板腱 5oz 加購', price: 200, category: '主餐加購', isAvailable: true },
+            { id: 'addon-ribeye-cap-5oz', name: '老饕上蓋 5oz 加購', price: 200, category: '主餐加購', isAvailable: true },
+            { id: 'addon-filet-mignon-5oz', name: '紐菲力 5oz 加購', price: 250, category: '主餐加購', isAvailable: true },
+            { id: 'addon-duck-breast', name: '櫻桃鴨胸 加購', price: 150, category: '主餐加購', isAvailable: true },
+            { id: 'addon-sea-bass', name: '鮮嫩鱸魚 加購', price: 150, category: '主餐加購', isAvailable: true },
+            { id: 'addon-chicken-leg', name: '鮮嫩雞腿 加購', price: 120, category: '主餐加購', isAvailable: true },
+            { id: 'addon-pork-chop', name: '美味豬排 加購', price: 120, category: '主餐加購', isAvailable: true },
+            { id: 'addon-fried-fish', name: '英式炸魚 加購', price: 120, category: '主餐加購', isAvailable: true },
+            { id: 'addon-jp-pork-cutlet', name: '日式豬排 加購', price: 120, category: '主餐加購', isAvailable: false },
+            { id: 'addon-dessert', name: '是日甜品 加購', price: 30, category: '其他加購', isAvailable: true },
+        ];
+
+        const DONENESS_LEVELS = [Doneness.Three, Doneness.Five, Doneness.Seven, Doneness.WellDone];
+        const SAUCE_CHOICES = ["巴醋", "橙汁", "椒鹽", "芥末", "泡菜", "BBQ醬", "黑胡椒", "蒜味醬"];
+        const DRINK_CHOICES = ["無糖紅茶", "冰涼可樂"];
+
+        // From components/icons.tsx
+        const PlusIcon = ({ className = "h-5 w-5" }) => (
+          <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+        );
+
+        const MinusIcon = ({ className = "h-5 w-5" }) => (
+          <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 12H6" />
+          </svg>
+        );
+
+        const TrashIcon = ({ className = "h-5 w-5" }) => (
+          <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+        );
+
+        const CloseIcon = ({ className = "h-6 w-6" }) => (
+          <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+          </svg>
+        );
+
+        const CartIcon = ({ className = "h-6 w-6" }) => (
+          <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m-6 4a1 1 0 11-2 0 1 1 0 012 0zm7 0a1 1 0 11-2 0 1 1 0 012 0z" />
+          </svg>
+        );
+
+        const CheckIcon = ({ className = "h-6 w-6" }) => (
+          <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+          </svg>
+        );
+        
+        const SearchIcon = ({ className = "h-5 w-5" }) => (
+            <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+        );
+
+        const RefreshIcon = ({ className = "h-5 w-5" }) => (
+            <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+        );
+        
+        const PencilIcon = ({ className = "h-5 w-5" }) => (
+            <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.5L15.232 5.232z" />
+            </svg>
+        );
+
+        const MenuIcon = ({ className = "h-6 w-6" }) => (
+            <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
+            </svg>
+        );
+
+        const ChartIcon = ({ className = "h-6 w-6" }) => (
+            <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+            </svg>
+        );
+
+        const SettingsIcon = ({ className = "h-6 w-6" }) => (
+            <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+              <path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            </svg>
+        );
+
+        const PrintIcon = ({ className = "h-6 w-6" }) => (
+            <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
+            </svg>
+        );
+
+        // From apiService.ts
         const API_URL = 'https://script.google.com/macros/s/AKfycbzjaQetvgEgkXfcahjL4iqnaWvUuHAJ1NJZRKlsLOA-QjTOq9GGJlK2tf-QJKuSjvtVsQ/exec';
 
         const apiService = {
-          async getAllOrders() {
+          async getMenuAndAddons() {
             try {
-              const response = await fetch(`${API_URL}?action=getAllOrders`);
+              const response = await fetch(`${API_URL}?action=getMenu`);
               if (!response.ok) {
                 throw new Error('Network response was not ok');
               }
               const data = await response.json();
-              return data;
+              if (!data.menu || !data.addons) {
+                throw new Error('Invalid data structure from API');
+              }
+              return { ...data, from: 'api' };
             } catch (error) {
-              console.error("Failed to fetch orders:", error);
-              return { success: false, message: error.message };
+              console.warn("API fetch failed, using fallback.", error);
+              return { menu: MENU_DATA, addons: ADDONS, from: 'fallback' };
             }
           },
 
-          async updateOrderStatus(orderId, newStatus) {
+          async submitOrder(orderData) {
             try {
                 const payload = {
-                    action: 'updateOrderStatus',
-                    orderId: orderId,
-                    status: newStatus,
+                    action: 'createOrder',
+                    orderData: {
+                        customerName: orderData.customerInfo.name,
+                        customerPhone: orderData.customerInfo.phone,
+                        tableNumber: orderData.customerInfo.tableNumber,
+                        orderType: orderData.orderType,
+                        items: orderData.items, // Pass the full cart items array
+                        totalAmount: orderData.totalPrice,
+                        timestamp: new Date().toISOString(),
+                    },
                 };
                 
                 const response = await fetch(API_URL, {
@@ -108,996 +274,1887 @@
                 const responseText = await response.text();
                 try {
                     const result = JSON.parse(responseText);
-                    return result;
+                    if (!result.success) {
+                        throw new Error(result.message || 'The server indicated an unknown error.');
+                    }
+                    return result; // Should include orderId now
                 } catch (e) {
                     throw new Error(`Received an invalid response from the server: ${responseText}`);
                 }
 
             } catch (error) {
-                console.error("Failed to update order status:", error);
+                console.error("Failed to submit order:", error);
                 if (error instanceof Error) {
                     throw error;
                 }
-                throw new Error('An unknown error occurred during status update.');
+                throw new Error('An unknown error occurred during order submission.');
             }
           },
-
-          async getSalesData(dateRange) {
+          async getOrderStatus(orderId) {
+             try {
+                const response = await fetch(`${API_URL}?action=getOrderStatus&orderId=${orderId}`);
+                if (!response.ok) {
+                    throw new Error('查詢時發生網路錯誤');
+                }
+                return await response.json();
+             } catch (error) {
+                console.error("Failed to get order status:", error);
+                return { success: false, message: error.message };
+             }
+          },
+          async getAllOrders() {
             try {
-              const response = await fetch(`${API_URL}?action=getSalesData&dateRange=${dateRange}`);
-              if (!response.ok) {
-                throw new Error('Network response was not ok');
-              }
-              const data = await response.json();
-              return data;
+                const response = await fetch(`${API_URL}?action=getAllOrders`);
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return await response.json();
             } catch (error) {
-              console.error("Failed to fetch sales data:", error);
-              // 返回模擬數據
-              return this.getMockSalesData(dateRange);
+                console.error("Failed to get all orders:", error);
+                return { success: false, message: error.message };
             }
           },
+          async updateOrderStatus(orderId, status) {
+            try {
+                const payload = {
+                    action: 'updateStatus',
+                    orderId,
+                    status
+                };
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify(payload),
+                });
 
-          getMockSalesData(dateRange) {
-            // 模擬銷售數據
-            const items = [
-              '香煎海盜牛排套餐 7oz',
-              '香煎海盜牛排套餐 14oz',
-              '香煎特選板腱套餐 10oz',
-              '香煎老饕上蓋套餐 7oz',
-              '香煎紐菲力套餐 7oz',
-              '香煎櫻桃鴨胸套餐 10oz',
-              '香煎鮮嫩鱸魚套餐 10oz',
-              '香煎鮮嫩雞腿套餐 10oz',
-              '香煎美味豬排套餐 10oz',
-              '英式炸魚套餐 10oz'
-            ];
-
-            const salesByItem = {};
-            items.forEach(item => {
-              salesByItem[item] = Math.floor(Math.random() * 20) + 5;
-            });
-
-            const dailySales = [];
-            const days = dateRange === 'week' ? 7 : 30;
-            for (let i = 0; i < days; i++) {
-              dailySales.push({
-                date: new Date(Date.now() - (days - i - 1) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-                amount: Math.floor(Math.random() * 10000) + 5000
-              });
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error("Failed to update order status:", error);
+                return { success: false, message: error.message };
             }
+          },
+          async updateMenuItem(itemId, updates) {
+            try {
+                const payload = {
+                    action: 'updateMenuItem',
+                    itemId,
+                    updates
+                };
+                
+                const response = await fetch(API_URL, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'text/plain;charset=utf-8',
+                    },
+                    body: JSON.stringify(payload),
+                });
 
-            return {
-              success: true,
-              totalRevenue: dailySales.reduce((sum, day) => sum + day.amount, 0),
-              totalOrders: Math.floor(Math.random() * 50) + 30,
-              averageOrderValue: Math.floor(Math.random() * 300) + 200,
-              salesByItem,
-              dailySales
-            };
+                if (!response.ok) {
+                    throw new Error('Network response was not ok');
+                }
+                return await response.json();
+            } catch (error) {
+                console.error("Failed to update menu item:", error);
+                return { success: false, message: error.message };
+            }
           }
         };
+        
+        // OrderQueryModal component
+        const OrderQueryModal = ({ isOpen, onClose }) => {
+            const [orderIdInput, setOrderIdInput] = React.useState('');
+            const [searchResult, setSearchResult] = React.useState(null);
+            const [isLoading, setIsLoading] = React.useState(false);
+            const [error, setError] = React.useState(null);
+            const [orderHistory, setOrderHistory] = React.useState([]);
+            
+            const printRef = React.useRef(null);
+            
+            const aggregatedOptions = React.useMemo(() => {
+                if (!searchResult || !searchResult.items) return { drinks: {}, sauces: {}, addons: {} };
+                
+                const drinks = {};
+                const sauces = {};
+                const addons = {};
 
-        // 圖標組件
-        const MenuIcon = ({ className = "h-6 w-6" }) => (
-          <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-          </svg>
-        );
+                searchResult.items.forEach(cartItem => {
+                    if (cartItem.selectedDrinks) {
+                        Object.entries(cartItem.selectedDrinks).forEach(([name, quantity]) => {
+                            drinks[name] = (drinks[name] || 0) + quantity;
+                        });
+                    }
+                    if (cartItem.selectedSauces) {
+                        cartItem.selectedSauces.forEach(sauce => {
+                            sauces[sauce.name] = (sauces[sauce.name] || 0) + sauce.quantity;
+                        });
+                    }
+                    if (cartItem.selectedAddons) {
+                        cartItem.selectedAddons.forEach(addon => {
+                            addons[addon.name] = {
+                                quantity: (addons[addon.name]?.quantity || 0) + addon.quantity,
+                                price: addon.price
+                            };
+                        });
+                    }
+                });
 
-        const OrdersIcon = ({ className = "h-6 w-6" }) => (
-          <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
-        );
+                return { drinks, sauces, addons };
+            }, [searchResult]);
 
-        const AnalyticsIcon = ({ className = "h-6 w-6" }) => (
-          <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        );
 
-        const PrintIcon = ({ className = "h-6 w-6" }) => (
-          <svg className={className} xmlns="http://www.w3.org2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-          </svg>
-        );
+            const handleSearch = async (idToSearch) => {
+                const orderId = idToSearch || orderIdInput.trim();
+                if (!orderId) {
+                    setError('請輸入訂單編號');
+                    return;
+                }
+                setIsLoading(true);
+                setError(null);
+                setSearchResult(null);
+                const result = await apiService.getOrderStatus(orderId);
+                if (result.success) {
+                    setSearchResult(result.order);
+                } else {
+                    setError(result.message || '查詢失敗，請確認訂單編號是否正確。');
+                }
+                setIsLoading(false);
+            };
 
-        const CloseIcon = ({ className = "h-6 w-6" }) => (
-          <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-          </svg>
-        );
-
-        const RefreshIcon = ({ className = "h-5 w-5" }) => (
-          <svg className={className} xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
-        );
-
-        // 訂單管理組件
-        const OrdersManagement = ({ orders, onUpdateStatus, isLoading }) => {
-          const [filter, setFilter] = React.useState('all');
-          const [selectedOrder, setSelectedOrder] = React.useState(null);
-          const [isDetailModalOpen, setIsDetailModalOpen] = React.useState(false);
-
-          const filteredOrders = React.useMemo(() => {
-            if (filter === 'all') return orders;
-            return orders.filter(order => order.status === filter);
-          }, [orders, filter]);
-
-          const getStatusColor = (status) => {
-            switch (status) {
-              case '確認中': return 'bg-blue-500 text-white';
-              case '準備中': return 'bg-yellow-500 text-white';
-              case '可以取餐': return 'bg-purple-500 text-white';
-              case '完成': return 'bg-green-600 text-white';
-              case '取消': return 'bg-red-500 text-white';
-              default: return 'bg-slate-500 text-white';
+            const handleFormSubmit = (e) => {
+                e.preventDefault();
+                handleSearch();
             }
-          };
 
-          const handleStatusChange = async (orderId, newStatus) => {
-            await onUpdateStatus(orderId, newStatus);
-          };
+            const handleHistorySearch = (id) => {
+                setOrderIdInput(id);
+                handleSearch(id);
+            }
 
-          const openOrderDetail = (order) => {
-            setSelectedOrder(order);
-            setIsDetailModalOpen(true);
-          };
+            const clearHistory = () => {
+                localStorage.removeItem('steakhouse-orders');
+                setOrderHistory([]);
+            }
+            
+            const handlePrint = () => {
+                window.print();
+            };
+            
+            const handleLineShare = () => {
+                if (!searchResult || !searchResult.items) return;
+                
+                const itemsText = searchResult.items.map(item => {
+                    let itemDetails = [`- ${item.item.name} x${item.quantity}`];
+                    if (item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0) {
+                        itemDetails.push(`  熟度: ${Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}`);
+                    }
+                     if (item.selectedNotes) {
+                        itemDetails.push(`  備註: ${item.selectedNotes}`);
+                    }
+                    return itemDetails.join('\n');
+                }).join('\n\n');
 
-          const closeOrderDetail = () => {
-            setIsDetailModalOpen(false);
-            setSelectedOrder(null);
-          };
+                let aggregatedTextParts = [];
+                if (Object.keys(aggregatedOptions.drinks).length > 0) {
+                    aggregatedTextParts.push(`飲料: ${Object.entries(aggregatedOptions.drinks).map(([name, q]) => `${name} x${q}`).join(', ')}`);
+                }
+                if (Object.keys(aggregatedOptions.sauces).length > 0) {
+                    aggregatedTextParts.push(`沾醬: ${Object.entries(aggregatedOptions.sauces).map(([name, q]) => `${name} x${q}`).join(', ')}`);
+                }
+                if (Object.keys(aggregatedOptions.addons).length > 0) {
+                    aggregatedTextParts.push(`加購:\n${Object.entries(aggregatedOptions.addons).map(([name, {quantity, price}]) => `  - ${name} x${quantity} (+${price * quantity})`).join('\n')}`);
+                }
+                const aggregatedText = aggregatedTextParts.join('\n');
+                const finalAggregatedText = aggregatedText ? `\n\n訂單選項總覽:\n${aggregatedText}` : '';
 
-          const printOrder = (order) => {
-            setSelectedOrder(order);
-            setTimeout(() => {
-              window.print();
-            }, 500);
-          };
+                const text = `我的訂單 #${searchResult.id}\n類型: ${searchResult.orderType}\n狀態: ${searchResult.status}\n\n餐點列表:\n${itemsText}${finalAggregatedText}\n\n總金額: $${searchResult.totalAmount}\n感謝您的訂購！`;
+                
+                const url = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
+                window.open(url, '_blank');
+            };
+            
+            const getStatusColor = (status) => {
+                switch (status) {
+                    case '確認中': return 'bg-blue-500 text-white';
+                    case '準備中': return 'bg-yellow-500 text-white';
+                    case '可以取餐': return 'bg-purple-500 text-white';
+                    case '完成': return 'bg-green-600 text-white';
+                    default: return 'bg-slate-500 text-white';
+                }
+            };
 
-          return (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                <h2 className="text-2xl font-bold text-slate-800">訂單管理</h2>
-                <div className="flex flex-wrap gap-2">
-                  <button 
-                    onClick={() => setFilter('all')} 
-                    className={`px-4 py-2 rounded-lg font-medium ${filter === 'all' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700'}`}
-                  >
-                    全部
-                  </button>
-                  <button 
-                    onClick={() => setFilter('確認中')} 
-                    className={`px-4 py-2 rounded-lg font-medium ${filter === '確認中' ? 'bg-blue-500 text-white' : 'bg-slate-200 text-slate-700'}`}
-                  >
-                    確認中
-                  </button>
-                  <button 
-                    onClick={() => setFilter('準備中')} 
-                    className={`px-4 py-2 rounded-lg font-medium ${filter === '準備中' ? 'bg-yellow-500 text-white' : 'bg-slate-200 text-slate-700'}`}
-                  >
-                    準備中
-                  </button>
-                  <button 
-                    onClick={() => setFilter('可以取餐')} 
-                    className={`px-4 py-2 rounded-lg font-medium ${filter === '可以取餐' ? 'bg-purple-500 text-white' : 'bg-slate-200 text-slate-700'}`}
-                  >
-                    可以取餐
-                  </button>
-                  <button 
-                    onClick={() => setFilter('完成')} 
-                    className={`px-4 py-2 rounded-lg font-medium ${filter === '完成' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700'}`}
-                  >
-                    完成
-                  </button>
-                </div>
-              </div>
+            React.useEffect(() => {
+                if (isOpen) {
+                    const savedOrders = JSON.parse(localStorage.getItem('steakhouse-orders') || '[]');
+                    setOrderHistory(savedOrders);
+                } else {
+                    setTimeout(() => {
+                        setOrderIdInput('');
+                        setSearchResult(null);
+                        setError(null);
+                        setIsLoading(false);
+                    }, 300);
+                }
+            }, [isOpen]);
 
-              {isLoading ? (
-                <div className="flex justify-center items-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-700"></div>
-                </div>
-              ) : filteredOrders.length === 0 ? (
-                <div className="text-center py-12 text-slate-500">
-                  <p className="text-lg">目前沒有訂單</p>
-                </div>
-              ) : (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full divide-y divide-slate-200">
-                    <thead className="bg-slate-50">
-                      <tr>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">訂單編號</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">顧客</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">類型</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">金額</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">狀態</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">時間</th>
-                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">操作</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-slate-200">
-                      {filteredOrders.map((order) => (
-                        <tr key={order.id} className="hover:bg-slate-50">
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{order.id}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                            <div>{order.customerName}</div>
-                            <div className="text-xs">{order.customerPhone}</div>
-                            {order.tableNumber && <div className="text-xs">桌號: {order.tableNumber}</div>}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{order.orderType}</td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-slate-900">${order.totalAmount}</td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className={`px-2 py-1 text-xs font-bold rounded-full ${getStatusColor(order.status)}`}>
-                              {order.status}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                            {new Date(order.timestamp).toLocaleString('zh-TW')}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium space-x-2">
-                            <button 
-                              onClick={() => openOrderDetail(order)}
-                              className="text-blue-600 hover:text-blue-900"
-                            >
-                              詳情
-                            </button>
-                            <button 
-                              onClick={() => printOrder(order)}
-                              className="text-slate-600 hover:text-slate-900"
-                            >
-                              列印
-                            </button>
-                            {order.status !== '完成' && order.status !== '取消' && (
-                              <select 
-                                value={order.status} 
-                                onChange={(e) => handleStatusChange(order.id, e.target.value)}
-                                className="text-sm border border-slate-300 rounded-md px-2 py-1"
-                              >
-                                <option value="確認中">確認中</option>
-                                <option value="準備中">準備中</option>
-                                <option value="可以取餐">可以取餐</option>
-                                <option value="完成">完成</option>
-                                <option value="取消">取消</option>
-                              </select>
+            return (
+                <div className={`fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose}>
+                    <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+                        <header className="p-5 relative border-b">
+                            <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-800"><CloseIcon /></button>
+                            <h2 className="text-2xl font-bold text-slate-800">查詢訂單狀態</h2>
+                        </header>
+                        <main className="px-6 py-4 space-y-4 overflow-y-auto">
+                            <form onSubmit={handleFormSubmit} className="flex items-center gap-2">
+                                <input 
+                                    type="text" 
+                                    value={orderIdInput}
+                                    onChange={e => setOrderIdInput(e.target.value)}
+                                    placeholder="請輸入您的訂單編號 (例如 ORD-...)"
+                                    className="flex-grow p-3 border border-slate-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none"
+                                />
+                                <button type="submit" disabled={isLoading} className="flex items-center justify-center bg-green-600 text-white font-semibold py-3 px-5 rounded-md hover:bg-green-700 disabled:bg-slate-400">
+                                    {isLoading ? <div className="animate-spin rounded-full h-5 w-5 border-t-2 border-b-2 border-white"></div> : '查詢'}
+                                </button>
+                            </form>
+                            
+                            {orderHistory.length > 0 && (
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                      <h4 className="text-sm font-semibold text-slate-500">查詢紀錄:</h4>
+                                      <button onClick={clearHistory} className="text-xs text-slate-400 hover:text-red-500">清除紀錄</button>
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                        {orderHistory.map(id => (
+                                            <button key={id} onClick={() => handleHistorySearch(id)} className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-mono px-2 py-1 rounded">
+                                                {id}
+                                            </button>
+                                        ))}
+                                    </div>
+                                </div>
                             )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              )}
 
-              {/* 訂單詳情模態框 */}
-              {isDetailModalOpen && selectedOrder && (
-                <OrderDetailModal 
-                  order={selectedOrder} 
-                  onClose={closeOrderDetail} 
-                  onStatusChange={handleStatusChange}
-                />
-              )}
-
-              {/* 列印區域 */}
-              {selectedOrder && (
-                <div className="print-area hidden">
-                  <OrderPrintView order={selectedOrder} />
+                            {error && <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-4" role="alert"><p>{error}</p></div>}
+                            
+                            {searchResult && (
+                                <>
+                                <div ref={printRef} className="print-area">
+                                  <div className="print-container bg-slate-50 p-4 rounded-lg border space-y-3">
+                                    <h3 className="text-xl font-bold text-slate-800">訂單詳情</h3>
+                                    <div className="flex justify-between items-center">
+                                        <p className="text-slate-600">訂單編號:</p>
+                                        <p className="font-mono font-semibold">{searchResult.id}</p>
+                                    </div>
+                                     <div className="flex justify-between items-center">
+                                        <p className="text-slate-600">訂單狀態:</p>
+                                        <span className={`px-3 py-1 text-sm font-bold rounded-full ${getStatusColor(searchResult.status)}`}>{searchResult.status}</span>
+                                    </div>
+                                    <div className="flex justify-between items-center">
+                                        <p className="text-slate-600">訂單類型:</p>
+                                        <p className="font-semibold">{searchResult.orderType}</p>
+                                    </div>
+                                    <div className="border-t pt-3">
+                                        <h4 className="font-semibold mb-2">餐點項目:</h4>
+                                        <ul className="space-y-2 text-slate-700 text-sm">
+                                            {(searchResult.items || []).map((item, index) => (
+                                                <li key={item.cartId || index} className="border-b pb-2 last:border-b-0">
+                                                    <p className="font-medium">{item.item.name} x{item.quantity}</p>
+                                                    <div className="text-xs text-slate-500 pl-2">
+                                                        {item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0 && <p>熟度: ${Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}</p>}
+                                                        {item.selectedNotes && <p>備註: ${item.selectedNotes}</p>}
+                                                    </div>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                    <div className="flex justify-between items-center border-t pt-3 mt-3">
+                                        <p className="text-lg font-bold">總金額:</p>
+                                        <p className="text-xl font-bold text-green-700">${searchResult.totalAmount}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="flex gap-2 justify-end no-print">
+                                    <button onClick={handleLineShare} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">LINE 分享</button>
+                                    <button onClick={handlePrint} className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">列印訂單</button>
+                                </div>
+                                </>
+                            )}
+                        </main>
+                         <footer className="p-4 border-t bg-slate-50 text-center">
+                            <button onClick={onClose} className="w-full sm:w-auto bg-slate-200 text-slate-800 font-bold py-3 px-6 rounded-lg hover:bg-slate-300 transition-colors">
+                                關閉
+                            </button>
+                        </footer>
+                    </div>
                 </div>
-              )}
+            );
+        };
+
+        // From components/Menu.tsx
+        const Menu = ({ menuData, onSelectItem }) => {
+          return (
+            <div className="space-y-12">
+              {menuData.map((category) => (
+                <div key={category.title} id={category.title}>
+                  <div className="mb-6 pb-2 border-b-2 border-green-700">
+                    <h2 className="text-3xl font-bold text-slate-800">{category.title}</h2>
+                    <p className="text-sm text-slate-500 mt-1">{category.description}</p>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                    {category.items.map((item) => (
+                      <div key={item.id} className={`bg-white rounded-lg shadow-lg overflow-hidden flex flex-col transition-transform transform hover:scale-105 relative ${!item.isAvailable ? 'opacity-60 bg-slate-50 cursor-not-allowed' : ''}`}>
+                        {!item.isAvailable && <div className="absolute top-4 right-4 bg-red-600 text-white text-sm font-bold px-3 py-1 rounded-full z-10 transform -rotate-12">售罄</div>}
+                        <div className="p-6 flex-grow flex flex-col justify-between">
+                          <div>
+                            <h3 className="text-xl font-semibold text-slate-900">{item.name.replace(/半全餐|半套餐/g, '套餐')}</h3>
+                            {item.weight && <p className="text-sm text-slate-500">{item.weight}</p>}
+                            <p className="text-2xl font-bold text-green-700 mt-2">${item.price}</p>
+                            {item.customizations && (
+                              <div className="mt-2 flex flex-wrap gap-1">
+                                {item.customizations.doneness && <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">可選熟度</span>}
+                                {item.customizations.sauceChoice && <span className="bg-blue-100 text-blue-800 text-xs px-2 py-1 rounded-full">可選醬料</span>}
+                                {item.customizations.drinkChoice && <span className="bg-orange-100 text-orange-800 text-xs px-2 py-1 rounded-full">可選附餐</span>}
+                              </div>
+                            )}
+                          </div>
+                          <button
+                            onClick={() => onSelectItem(item, category)}
+                            disabled={!item.isAvailable}
+                            className="mt-4 w-full flex items-center justify-center bg-green-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500 focus:ring-opacity-50 transition-colors disabled:bg-slate-400 disabled:cursor-not-allowed"
+                          >
+                            <PlusIcon className="h-5 w-5 mr-2" />
+                            <span>{item.isAvailable ? '加入餐點' : '已售完'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </div>
           );
         };
 
-        // 訂單詳情模態框
-        const OrderDetailModal = ({ order, onClose, onStatusChange }) => {
-          const printRef = React.useRef(null);
+        // From components/ItemModal.tsx
+        const ItemModal = ({ selectedItem, editingItem, addons, onClose, onConfirmSelection }) => {
+          const { item, category } = selectedItem;
+          const [quantity, setQuantity] = React.useState(1);
+          const isSteak = !!item.customizations?.doneness;
 
-          const getStatusColor = (status) => {
-            switch (status) {
-              case '確認中': return 'bg-blue-500 text-white';
-              case '準備中': return 'bg-yellow-500 text-white';
-              case '可以取餐': return 'bg-purple-500 text-white';
-              case '完成': return 'bg-green-600 text-white';
-              case '取消': return 'bg-red-500 text-white';
-              default: return 'bg-slate-500 text-white';
+          const [donenessQuantities, setDonenessQuantities] = React.useState({});
+          const [drinkQuantities, setDrinkQuantities] = React.useState({});
+          const [notes, setNotes] = React.useState('');
+          const [selectedAddons, setSelectedAddons] = React.useState([]);
+          const [selectedSauces, setSelectedSauces] = React.useState([]);
+
+          React.useEffect(() => {
+            if (editingItem) {
+              setQuantity(editingItem.quantity);
+              setDonenessQuantities(editingItem.selectedDonenesses || {});
+              setDrinkQuantities(editingItem.selectedDrinks || {});
+              setSelectedSauces(editingItem.selectedSauces || []);
+              setSelectedAddons(editingItem.selectedAddons || []);
+              setNotes(editingItem.selectedNotes || '');
+            } else {
+              setQuantity(1);
+              setDonenessQuantities({});
+              setDrinkQuantities({});
+              setSelectedSauces([]);
+              setSelectedAddons([]);
+              setNotes('');
             }
-          };
+          }, [editingItem, selectedItem]);
 
-          const handlePrint = () => {
-            window.print();
-          };
+          const allocatedDonenessCount = React.useMemo(() => Object.values(donenessQuantities).reduce((sum, count) => sum + count, 0), [donenessQuantities]);
+          const allocatedDrinkCount = React.useMemo(() => Object.values(drinkQuantities).reduce((sum, count) => sum + count, 0), [drinkQuantities]);
+          const totalSauceCount = React.useMemo(() => selectedSauces.reduce((sum, sauce) => sum + sauce.quantity, 0), [selectedSauces]);
+          const totalSauceLimit = quantity * 2;
 
-          const aggregatedOptions = React.useMemo(() => {
-            if (!order || !order.items) return { drinks: {}, sauces: {}, addons: {} };
-            
-            const drinks = {};
-            const sauces = {};
-            const addons = {};
+          const addonGroups = React.useMemo(() => {
+            return addons.reduce((acc, addon) => {
+              (acc[addon.category] = acc[addon.category] || []).push(addon);
+              return acc;
+            }, {});
+          }, [addons]);
 
-            order.items.forEach(cartItem => {
-              if (cartItem.selectedDrinks) {
-                Object.entries(cartItem.selectedDrinks).forEach(([name, quantity]) => {
-                  drinks[name] = (drinks[name] || 0) + quantity;
-                });
-              }
-              if (cartItem.selectedSauces) {
-                cartItem.selectedSauces.forEach(sauce => {
-                  sauces[sauce.name] = (sauces[sauce.name] || 0) + sauce.quantity;
-                });
-              }
-              if (cartItem.selectedAddons) {
-                cartItem.selectedAddons.forEach(addon => {
-                  addons[addon.name] = {
-                    quantity: (addons[addon.name]?.quantity || 0) + addon.quantity,
-                    price: addon.price
-                  };
-                });
-              }
+          const handleDonenessChange = React.useCallback((doneness, change) => {
+            setDonenessQuantities(prev => {
+                const newQuantities = { ...prev };
+                const currentCount = newQuantities[doneness] || 0;
+                const newCount = currentCount + change;
+                
+                if (newCount < 0) return prev;
+                if (change > 0 && allocatedDonenessCount >= quantity) return prev;
+
+                if (newCount === 0) {
+                    delete newQuantities[doneness];
+                } else {
+                    newQuantities[doneness] = newCount;
+                }
+                return newQuantities;
             });
+          }, [allocatedDonenessCount, quantity]);
 
-            return { drinks, sauces, addons };
-          }, [order]);
+          const handleDrinkChange = React.useCallback((drink, change) => {
+            setDrinkQuantities(prev => {
+                const newQuantities = { ...prev };
+                const currentCount = newQuantities[drink] || 0;
+                const newCount = currentCount + change;
+                
+                if (newCount < 0) return prev;
+                if (change > 0 && allocatedDrinkCount >= quantity) return prev;
+                
+                if (newCount === 0) {
+                    delete newQuantities[drink];
+                } else {
+                    newQuantities[drink] = newCount;
+                }
+                return newQuantities;
+            });
+          }, [allocatedDrinkCount, quantity]);
+
+          const handleAddonQuantityChange = React.useCallback((addon, change) => {
+            if (!addon.isAvailable && change > 0) return;
+            setSelectedAddons(prev => {
+              const existingAddon = prev.find(a => a.id === addon.id);
+              if (existingAddon) {
+                const newQuantity = existingAddon.quantity + change;
+                return newQuantity <= 0 ? prev.filter(a => a.id !== addon.id) : prev.map(a => a.id === addon.id ? { ...a, quantity: newQuantity } : a);
+              } else if (change > 0) {
+                return [...prev, { ...addon, quantity: change }];
+              }
+              return prev;
+            });
+          }, []);
+
+          const handleSauceChange = React.useCallback((sauceName, change) => {
+            setSelectedSauces(prev => {
+              const existingSauce = prev.find(s => s.name === sauceName);
+              if (existingSauce) {
+                const newQuantity = existingSauce.quantity + change;
+                if (newQuantity < 0) return prev;
+                if (totalSauceCount >= totalSauceLimit && change > 0) return prev;
+                if (newQuantity === 0) return prev.filter(s => s.name !== sauceName);
+                return prev.map(s => s.name === sauceName ? { ...s, quantity: newQuantity } : s);
+              } else if (change > 0 && totalSauceCount < totalSauceLimit) {
+                return [...prev, { name: sauceName, quantity: 1 }];
+              }
+              return prev;
+            });
+          }, [totalSauceCount, totalSauceLimit]);
+
+          const handleSubmit = () => {
+            if (isSteak && allocatedDonenessCount !== quantity) { alert(`請分配所有 ${quantity} 份餐點的熟度`); return; }
+            if (item.customizations?.drinkChoice && allocatedDrinkCount !== quantity) { alert(`請選擇所有 ${quantity} 份餐點的飲料`); return; }
+
+            const options = { 
+                donenesses: donenessQuantities,
+                drinks: drinkQuantities,
+                addons: selectedAddons, 
+                sauces: selectedSauces, 
+                notes: notes.trim() 
+            };
+            onConfirmSelection(item, quantity, options, category);
+            onClose();
+          };
+          
+          const totalAddonPrice = selectedAddons.reduce((sum, addon) => sum + (addon.price * addon.quantity), 0);
+          const totalPrice = (item.price * quantity) + totalAddonPrice;
 
           return (
             <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4" onClick={onClose}>
-              <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
+              <div className="bg-white rounded-lg shadow-2xl w-full max-w-lg max-h-[90vh] flex flex-col" onClick={e => e.stopPropagation()}>
                 <header className="p-6 relative border-b">
                   <button onClick={onClose} className="absolute top-4 right-4 text-slate-400 hover:text-slate-800"><CloseIcon /></button>
-                  <h2 className="text-2xl font-bold text-slate-800">訂單詳情</h2>
+                  <h2 className="text-2xl font-bold text-slate-800">{item.name.replace(/半全餐|半套餐/g, '套餐')}{item.weight && ` (${item.weight})`}</h2>
+                  <p className="text-xl font-semibold text-green-700 mt-2">${item.price}</p>
                 </header>
                 <main className="px-6 py-4 space-y-6 overflow-y-auto">
-                  <div ref={printRef} className="print-area">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-slate-700 border-b pb-2">訂單資訊</h3>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">訂單編號:</span>
-                            <span className="font-semibold">{order.id}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">訂單狀態:</span>
-                            <span className={`px-2 py-1 text-xs font-bold rounded-full ${getStatusColor(order.status)}`}>
-                              {order.status}
-                            </span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">訂單類型:</span>
-                            <span className="font-semibold">{order.orderType}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">下單時間:</span>
-                            <span className="font-semibold">{new Date(order.timestamp).toLocaleString('zh-TW')}</span>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="space-y-4">
-                        <h3 className="text-lg font-semibold text-slate-700 border-b pb-2">顧客資訊</h3>
-                        <div className="space-y-2">
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">姓名:</span>
-                            <span className="font-semibold">{order.customerName}</span>
-                          </div>
-                          <div className="flex justify-between">
-                            <span className="text-slate-600">電話:</span>
-                            <span className="font-semibold">{order.customerPhone}</span>
-                          </div>
-                          {order.tableNumber && (
-                            <div className="flex justify-between">
-                              <span className="text-slate-600">桌號:</span>
-                              <span className="font-semibold">{order.tableNumber}</span>
-                            </div>
-                          )}
-                        </div>
-                      </div>
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-slate-700">數量</h3>
+                    <div className="flex items-center gap-2">
+                      <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="p-2 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon /></button>
+                      <span className="text-xl font-bold w-12 text-center">{quantity}</span>
+                      <button onClick={() => setQuantity(q => q + 1)} className="p-2 rounded-full bg-slate-200 hover:bg-slate-300"><PlusIcon /></button>
                     </div>
-
-                    <div className="mt-6 space-y-4">
-                      <h3 className="text-lg font-semibold text-slate-700 border-b pb-2">餐點內容</h3>
-                      <div className="space-y-4">
-                        {order.items.map((item, index) => (
-                          <div key={item.cartId || index} className="border-b pb-4 last:border-b-0">
-                            <div className="flex justify-between items-start">
-                              <div>
-                                <p className="font-semibold">{item.item.name} x{item.quantity}</p>
-                                <div className="text-sm text-slate-500 mt-1 space-y-1">
-                                  {item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0 && (
-                                    <p>熟度: {Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}</p>
-                                  )}
-                                  {item.selectedNotes && <p>備註: {item.selectedNotes}</p>}
-                                </div>
-                              </div>
-                              <p className="font-semibold">${item.totalPrice}</p>
+                  </div>
+                  {isSteak && (
+                    <div>
+                      <div className="flex justify-between items-baseline mb-3">
+                        <h3 className="text-lg font-semibold text-slate-700">牛排熟度*</h3>
+                        <span className={`font-semibold ${allocatedDonenessCount === quantity ? 'text-green-600' : 'text-red-500'}`}>已分配 {allocatedDonenessCount} / {quantity}</span>
+                      </div>
+                      <div className="space-y-3">
+                        {DONENESS_LEVELS.map(d => (
+                          <div key={d} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg">
+                            <span className="font-medium text-slate-800">{d}</span>
+                            <div className="flex items-center gap-3">
+                              <button onClick={() => handleDonenessChange(d, -1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon className="h-4 w-4" /></button>
+                              <span className="text-lg font-semibold w-8 text-center">{donenessQuantities[d] || 0}</span>
+                              <button onClick={() => handleDonenessChange(d, 1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300" disabled={allocatedDonenessCount >= quantity}><PlusIcon className="h-4 w-4" /></button>
                             </div>
                           </div>
                         ))}
                       </div>
                     </div>
-
-                    {(Object.keys(aggregatedOptions.drinks).length > 0 || 
-                      Object.keys(aggregatedOptions.sauces).length > 0 || 
-                      Object.keys(aggregatedOptions.addons).length > 0) && (
-                      <div className="mt-6 space-y-4">
-                        <h3 className="text-lg font-semibold text-slate-700 border-b pb-2">訂單選項總覽</h3>
-                        <div className="space-y-2 text-sm">
-                          {Object.keys(aggregatedOptions.drinks).length > 0 && (
-                            <div className="flex justify-between">
-                              <span>飲料:</span>
-                              <span>{Object.entries(aggregatedOptions.drinks).map(([name, q]) => `${name} x${q}`).join(', ')}</span>
-                            </div>
-                          )}
-                          {Object.keys(aggregatedOptions.sauces).length > 0 && (
-                            <div className="flex justify-between">
-                              <span>沾醬:</span>
-                              <span>{Object.entries(aggregatedOptions.sauces).map(([name, q]) => `${name} x${q}`).join(', ')}</span>
-                            </div>
-                          )}
-                          {Object.keys(aggregatedOptions.addons).length > 0 && (
-                            <div>
-                              <div className="font-medium mb-1">加購:</div>
-                              <div className="pl-4 space-y-1">
-                                {Object.entries(aggregatedOptions.addons).map(([name, {quantity, price}]) => (
-                                  <div key={name} className="flex justify-between">
-                                    <span>{name} x{quantity}</span>
-                                    <span>+${price * quantity}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            </div>
-                          )}
+                  )}
+                  {item.customizations?.drinkChoice && (
+                    <div>
+                        <div className="flex justify-between items-baseline mb-3">
+                            <h3 className="text-lg font-semibold text-slate-700">飲料*</h3>
+                            <span className={`font-semibold ${allocatedDrinkCount === quantity ? 'text-green-600' : 'text-red-500'}`}>已選擇 {allocatedDrinkCount} / {quantity}</span>
                         </div>
+                        <div className="space-y-3">
+                            {DRINK_CHOICES.map(drink => (
+                                <div key={drink} className="flex items-center justify-between bg-slate-50 p-3 rounded-lg">
+                                    <span className="font-medium text-slate-800">{drink}</span>
+                                    <div className="flex items-center gap-3">
+                                        <button onClick={() => handleDrinkChange(drink, -1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon className="h-4 w-4" /></button>
+                                        <span className="text-lg font-semibold w-8 text-center">{drinkQuantities[drink] || 0}</span>
+                                        <button onClick={() => handleDrinkChange(drink, 1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300" disabled={allocatedDrinkCount >= quantity}><PlusIcon className="h-4 w-4" /></button>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                  )}
+                  {item.customizations?.sauceChoice && (
+                    <div>
+                      <div className="flex justify-between items-baseline mb-3">
+                        <h3 className="text-lg font-semibold text-slate-700">主菜沾醬 (每份選2)</h3>
+                        <span className={`font-semibold ${totalSauceCount === totalSauceLimit ? 'text-green-600' : 'text-slate-500'}`}>已選 {totalSauceCount} / {totalSauceLimit}</span>
                       </div>
-                    )}
-
-                    <div className="mt-6 pt-4 border-t">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xl font-bold">總金額</span>
-                        <span className="text-2xl font-bold text-green-700">${order.totalAmount}</span>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+                        {SAUCE_CHOICES.map(sauce => (
+                          <div key={sauce} className="flex items-center justify-between bg-slate-50 p-2 rounded-lg">
+                            <span className="font-medium text-slate-800 text-sm">{sauce}</span>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => handleSauceChange(sauce, -1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon className="h-4 w-4" /></button>
+                              <span className="text-md font-semibold w-5 text-center">{selectedSauces.find(s => s.name === sauce)?.quantity || 0}</span>
+                              <button onClick={() => handleSauceChange(sauce, 1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300" disabled={totalSauceCount >= totalSauceLimit}><PlusIcon className="h-4 w-4" /></button>
+                            </div>
+                          </div>
+                        ))}
                       </div>
                     </div>
-                  </div>
-                </main>
-                <footer className="p-6 border-t bg-slate-50 flex justify-between no-print">
-                  {order.status !== '完成' && order.status !== '取消' && (
-                    <select 
-                      value={order.status} 
-                      onChange={(e) => onStatusChange(order.id, e.target.value)}
-                      className="text-sm border border-slate-300 rounded-md px-3 py-2"
-                    >
-                      <option value="確認中">確認中</option>
-                      <option value="準備中">準備中</option>
-                      <option value="可以取餐">可以取餐</option>
-                      <option value="完成">完成</option>
-                      <option value="取消">取消</option>
-                    </select>
                   )}
-                  <div className="flex gap-2 ml-auto">
-                    <button 
-                      onClick={handlePrint}
-                      className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600"
-                    >
-                      列印訂單
-                    </button>
-                    <button 
-                      onClick={onClose}
-                      className="bg-slate-200 text-slate-800 px-4 py-2 rounded-lg hover:bg-slate-300"
-                    >
-                      關閉
-                    </button>
-                  </div>
+                  {Object.entries(addonGroups).map(([category, addonList]) => (
+                    <div key={category}>
+                      <h3 className="text-lg font-semibold text-slate-700 mb-3">{category}</h3>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {addonList.map(addon => (
+                          <div key={addon.id} className={`flex items-center justify-between p-3 rounded-md ${addon.isAvailable ? 'bg-slate-100' : 'bg-slate-200 opacity-60'}`}>
+                            <div>
+                              <span className={`text-slate-800 text-sm ${!addon.isAvailable ? 'line-through' : ''}`}>{addon.name}</span>
+                              <span className="ml-2 font-semibold text-slate-500 text-sm">+${addon.price}</span>
+                              {!addon.isAvailable && <span className="ml-2 text-red-500 text-xs font-bold">售完</span>}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <button onClick={() => handleAddonQuantityChange(addon, -1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300 disabled:bg-slate-300" disabled={!addon.isAvailable}><MinusIcon className="h-4 w-4" /></button>
+                              <span className="text-lg font-semibold w-6 text-center">{selectedAddons.find(a => a.id === addon.id)?.quantity || 0}</span>
+                              <button onClick={() => handleAddonQuantityChange(addon, 1)} className="p-1.5 rounded-full bg-slate-200 hover:bg-slate-300 disabled:bg-slate-300" disabled={!addon.isAvailable}><PlusIcon className="h-4 w-4" /></button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  ))}
+                   {item.customizations?.notes && (
+                    <div>
+                      <h3 className="text-lg font-semibold text-slate-700 mb-3">備註</h3>
+                      <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={2} placeholder="有任何特殊需求嗎？" className="w-full p-3 border border-slate-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none"></textarea>
+                    </div>
+                  )}
+                </main>
+                <footer className="p-6 border-t bg-slate-50">
+                  <button onClick={handleSubmit} className="w-full bg-green-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-green-700 transition-colors text-lg">
+                    {editingItem ? `更新 ${totalPrice} 到購物車` : `加入 ${totalPrice} 到購物車`}
+                  </button>
                 </footer>
               </div>
             </div>
           );
         };
 
-        // 訂單列印視圖
-        const OrderPrintView = ({ order }) => {
-          const aggregatedOptions = React.useMemo(() => {
-            if (!order || !order.items) return { drinks: {}, sauces: {}, addons: {} };
+        // From components/Cart.tsx
+        const CartSuccessView = ({ handleNewOrder, orderId, orderData }) => {
+            const [orderDetails, setOrderDetails] = React.useState(null);
+            const printRef = React.useRef(null);
+
+            React.useEffect(() => {
+                if (orderId && orderData) {
+                    // Immediately build the details object so the UI can render.
+                    // Assume 'Confirming' status until we hear back from the server.
+                    const initialDetails = {
+                        id: orderId,
+                        status: '確認中',
+                        orderType: orderData.orderType,
+                        items: orderData.items,
+                        totalAmount: orderData.totalPrice
+                    };
+                    setOrderDetails(initialDetails);
             
-            const drinks = {};
-            const sauces = {};
-            const addons = {};
-
-            order.items.forEach(cartItem => {
-              if (cartItem.selectedDrinks) {
-                Object.entries(cartItem.selectedDrinks).forEach(([name, quantity]) => {
-                  drinks[name] = (drinks[name] || 0) + quantity;
-                });
-              }
-              if (cartItem.selectedSauces) {
-                cartItem.selectedSauces.forEach(sauce => {
-                  sauces[sauce.name] = (sauces[sauce.name] || 0) + sauce.quantity;
-                });
-              }
-              if (cartItem.selectedAddons) {
-                cartItem.selectedAddons.forEach(addon => {
-                  addons[addon.name] = {
-                    quantity: (addons[addon.name]?.quantity || 0) + addon.quantity,
-                    price: addon.price
-                  };
-                });
-              }
-            });
-
-            return { drinks, sauces, addons };
-          }, [order]);
-
-          return (
-            <div className="p-8 max-w-md mx-auto">
-              <div className="text-center mb-6">
-                <h1 className="text-2xl font-bold">美味廚房</h1>
-                <p className="text-slate-600">訂單明細</p>
-              </div>
-              
-              <div className="mb-6">
-                <div className="flex justify-between mb-2">
-                  <span>訂單編號:</span>
-                  <span className="font-semibold">{order.id}</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span>顧客:</span>
-                  <span className="font-semibold">{order.customerName}</span>
-                </div>
-                <div className="flex justify-between mb-2">
-                  <span>電話:</span>
-                  <span className="font-semibold">{order.customerPhone}</span>
-                </div>
-                {order.tableNumber && (
-                  <div className="flex justify-between mb-2">
-                    <span>桌號:</span>
-                    <span className="font-semibold">{order.tableNumber}</span>
-                  </div>
-                )}
-                <div className="flex justify-between mb-2">
-                  <span>類型:</span>
-                  <span className="font-semibold">{order.orderType}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>時間:</span>
-                  <span className="font-semibold">{new Date(order.timestamp).toLocaleString('zh-TW')}</span>
-                </div>
-              </div>
-              
-              <div className="border-t border-b border-slate-300 py-4 my-4">
-                <h2 className="text-lg font-bold mb-3">餐點內容</h2>
-                {order.items.map((item, index) => (
-                  <div key={item.cartId || index} className="mb-3">
-                    <div className="flex justify-between">
-                      <span className="font-semibold">{item.item.name} x{item.quantity}</span>
-                      <span>${item.totalPrice}</span>
-                    </div>
-                    {item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0 && (
-                      <div className="text-sm text-slate-600 pl-2">
-                        熟度: {Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}
-                      </div>
-                    )}
-                    {item.selectedNotes && (
-                      <div className="text-sm text-slate-600 pl-2">備註: {item.selectedNotes}</div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              {(Object.keys(aggregatedOptions.drinks).length > 0 || 
-                Object.keys(aggregatedOptions.sauces).length > 0 || 
-                Object.keys(aggregatedOptions.addons).length > 0) && (
-                <div className="mb-4">
-                  <h2 className="text-lg font-bold mb-2">訂單選項</h2>
-                  <div className="text-sm space-y-1">
-                    {Object.keys(aggregatedOptions.drinks).length > 0 && (
-                      <div>飲料: {Object.entries(aggregatedOptions.drinks).map(([name, q]) => `${name} x${q}`).join(', ')}</div>
-                    )}
-                    {Object.keys(aggregatedOptions.sauces).length > 0 && (
-                      <div>沾醬: {Object.entries(aggregatedOptions.sauces).map(([name, q]) => `${name} x${q}`).join(', ')}</div>
-                    )}
-                    {Object.keys(aggregatedOptions.addons).length > 0 && (
-                      <div>
-                        加購:
-                        <ul className="list-disc list-inside pl-2">
-                          {Object.entries(aggregatedOptions.addons).map(([name, {quantity, price}]) => (
-                            <li key={name}>{name} x{quantity} (+${price * quantity})</li>
-                          ))}
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-              
-              <div className="border-t border-slate-300 pt-4">
-                <div className="flex justify-between text-xl font-bold">
-                  <span>總計</span>
-                  <span>${order.totalAmount}</span>
-                </div>
-              </div>
-              
-              <div className="text-center mt-8 text-slate-500 text-sm">
-                <p>感謝您的惠顧</p>
-                <p>美味廚房</p>
-              </div>
-            </div>
-          );
-        };
-
-        // 銷售統計組件
-        const SalesAnalytics = () => {
-          const [salesData, setSalesData] = React.useState(null);
-          const [dateRange, setDateRange] = React.useState('week');
-          const [isLoading, setIsLoading] = React.useState(true);
-
-          const revenueChartRef = React.useRef(null);
-          const topProductsChartRef = React.useRef(null);
-
-          React.useEffect(() => {
-            fetchSalesData();
-          }, [dateRange]);
-
-          const fetchSalesData = async () => {
-            setIsLoading(true);
-            const data = await apiService.getSalesData(dateRange);
-            if (data.success) {
-              setSalesData(data);
-            }
-            setIsLoading(false);
-          };
-
-          React.useEffect(() => {
-            if (salesData && revenueChartRef.current && topProductsChartRef.current) {
-              // 營業額趨勢圖
-              const revenueCtx = revenueChartRef.current.getContext('2d');
-              const revenueChart = new Chart(revenueCtx, {
-                type: 'line',
-                data: {
-                  labels: salesData.dailySales.map(day => day.date),
-                  datasets: [{
-                    label: '每日營業額',
-                    data: salesData.dailySales.map(day => day.amount),
-                    borderColor: 'rgb(34, 197, 94)',
-                    backgroundColor: 'rgba(34, 197, 94, 0.1)',
-                    tension: 0.3,
-                    fill: true
-                  }]
-                },
-                options: {
-                  responsive: true,
-                  plugins: {
-                    title: {
-                      display: true,
-                      text: '營業額趨勢'
-                    }
-                  },
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      ticks: {
-                        callback: function(value) {
-                          return '$' + value.toLocaleString();
+                    const fetchStatus = async () => {
+                        const result = await apiService.getOrderStatus(orderId);
+                        if (result.success && result.order.status) {
+                            // Update the state with the real status
+                            setOrderDetails(prevDetails => ({
+                                ...prevDetails,
+                                status: result.order.status
+                            }));
                         }
-                      }
-                    }
-                  }
+                        // If it fails, we just stick with '確認中'
+                    };
+                    fetchStatus();
+                } else {
+                    setOrderDetails(null);
                 }
-              });
+            }, [orderId, orderData]);
+            
+            const aggregatedOptions = React.useMemo(() => {
+                if (!orderDetails || !orderDetails.items) return { drinks: {}, sauces: {}, addons: {} };
+                
+                const drinks = {};
+                const sauces = {};
+                const addons = {};
 
-              // 熱門商品排行
-              const topProductsCtx = topProductsChartRef.current.getContext('2d');
-              const topProducts = Object.entries(salesData.salesByItem)
-                .sort((a, b) => b[1] - a[1])
-                .slice(0, 10);
+                orderDetails.items.forEach(cartItem => {
+                    if (cartItem.selectedDrinks) {
+                        Object.entries(cartItem.selectedDrinks).forEach(([name, quantity]) => {
+                            drinks[name] = (drinks[name] || 0) + quantity;
+                        });
+                    }
+                    if (cartItem.selectedSauces) {
+                        cartItem.selectedSauces.forEach(sauce => {
+                            sauces[sauce.name] = (sauces[sauce.name] || 0) + sauce.quantity;
+                        });
+                    }
+                    if (cartItem.selectedAddons) {
+                        cartItem.selectedAddons.forEach(addon => {
+                            addons[addon.name] = {
+                                quantity: (addons[addon.name]?.quantity || 0) + addon.quantity,
+                                price: addon.price
+                            };
+                        });
+                    }
+                });
 
-              const topProductsChart = new Chart(topProductsCtx, {
-                type: 'bar',
-                data: {
-                  labels: topProducts.map(item => item[0]),
-                  datasets: [{
-                    label: '銷售數量',
-                    data: topProducts.map(item => item[1]),
-                    backgroundColor: 'rgba(59, 130, 246, 0.7)',
-                    borderColor: 'rgb(59, 130, 246)',
-                    borderWidth: 1
-                  }]
-                },
-                options: {
-                  responsive: true,
-                  plugins: {
-                    title: {
-                      display: true,
-                      text: '熱門商品排行'
+                return { drinks, sauces, addons };
+            }, [orderDetails]);
+
+            const handlePrint = () => {
+                window.print();
+            };
+
+            const handleLineShare = () => {
+                if (!orderDetails || !orderDetails.items) return;
+                
+                const itemsText = orderDetails.items.map(item => {
+                    let itemDetails = [`- ${item.item.name} x${item.quantity}`];
+                    if (item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0) {
+                        itemDetails.push(`  熟度: ${Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}`);
                     }
-                  },
-                  scales: {
-                    y: {
-                      beginAtZero: true
+                     if (item.selectedNotes) {
+                        itemDetails.push(`  備註: ${item.selectedNotes}`);
                     }
-                  }
+                    return itemDetails.join('\n');
+                }).join('\n\n');
+
+                let aggregatedTextParts = [];
+                if (Object.keys(aggregatedOptions.drinks).length > 0) {
+                    aggregatedTextParts.push(`飲料: ${Object.entries(aggregatedOptions.drinks).map(([name, q]) => `${name} x${q}`).join(', ')}`);
                 }
-              });
+                if (Object.keys(aggregatedOptions.sauces).length > 0) {
+                    aggregatedTextParts.push(`沾醬: ${Object.entries(aggregatedOptions.sauces).map(([name, q]) => `${name} x${q}`).join(', ')}`);
+                }
+                if (Object.keys(aggregatedOptions.addons).length > 0) {
+                    aggregatedTextParts.push(`加購:\n${Object.entries(aggregatedOptions.addons).map(([name, {quantity, price}]) => `  - ${name} x${quantity} (+${price * quantity})`).join('\n')}`);
+                }
+                const aggregatedText = aggregatedTextParts.join('\n');
+                const finalAggregatedText = aggregatedText ? `\n\n訂單選項總覽:\n${aggregatedText}` : '';
 
-              return () => {
-                revenueChart.destroy();
-                topProductsChart.destroy();
-              };
-            }
-          }, [salesData]);
+                const text = `我的訂單 #${orderDetails.id}\n類型: ${orderDetails.orderType}\n狀態: ${orderDetails.status}\n\n餐點列表:\n${itemsText}${finalAggregatedText}\n\n總金額: $${orderDetails.totalAmount}\n感謝您的訂購！`;
+                
+                const url = `https://line.me/R/msg/text/?${encodeURIComponent(text)}`;
+                window.open(url, '_blank');
+            };
 
-          if (isLoading) {
             return (
-              <div className="bg-white rounded-lg shadow-md p-6">
-                <div className="flex justify-center items-center py-12">
-                  <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-green-700"></div>
+                <div className="flex flex-col h-full">
+                    <div className="flex justify-between items-center p-5 border-b no-print flex-shrink-0">
+                        <h2 className="text-2xl font-bold text-slate-800">訂單確認</h2>
+                        <button onClick={handleNewOrder} className="text-slate-500 hover:text-slate-800"><CloseIcon /></button>
+                    </div>
+
+                    <div className="flex-grow overflow-y-auto p-6">
+                        <div className="text-center">
+                            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4 mx-auto">
+                                <CheckIcon className="h-8 w-8 text-green-600" />
+                            </div>
+                            <h3 className="text-2xl font-bold text-slate-800 mb-2">訂單提交成功!</h3>
+                            <p className="text-slate-500 mb-4">我們會盡快為您準備餐點。</p>
+                        </div>
+                                                
+                        {!orderDetails ? <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-green-700 my-4 mx-auto"></div> : (
+                            <div className="w-full text-left">
+                                <div ref={printRef} className="print-area w-full bg-slate-50 p-4 rounded-lg mb-4 border space-y-2">
+                                    <div className="print-container">
+                                        <h3 className="text-lg font-bold text-slate-800 text-center mb-3">訂單摘要</h3>
+                                        <div className="flex justify-between items-baseline">
+                                            <p className="text-sm text-slate-600">訂單編號:</p>
+                                            <p className="font-mono font-bold text-slate-800">{orderDetails.id}</p>
+                                        </div>
+                                         <div className="flex justify-between items-baseline">
+                                            <p className="text-sm text-slate-600">類型:</p>
+                                            <p className="font-semibold">{orderDetails.orderType}</p>
+                                        </div>
+                                         <div className="flex justify-between items-baseline mb-2">
+                                            <p className="text-sm text-slate-600">狀態:</p>
+                                            <p className="font-semibold">{orderDetails.status}</p>
+                                        </div>
+                                        
+                                        <div className="border-t border-slate-300 pt-2 mt-2">
+                                            <div className="text-sm space-y-4">
+                                                <div className="bg-white rounded-lg p-3">
+                                                    <h4 className="text-base font-bold text-slate-700 mb-2 pb-1 border-b">餐點列表</h4>
+                                                    <div className="space-y-3 text-sm">
+                                                    {orderDetails.items.map((item, index) => (
+                                                      <div key={item.cartId || index}>
+                                                          <p className="font-medium text-slate-800">{item.item.name.replace(/半全餐|半套餐/g, '套餐')} <span className="font-normal">x{item.quantity}</span></p>
+                                                          <div className="text-xs text-slate-500 pl-2">
+                                                            {item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0 && <p>熟度: ${Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}</p>}
+                                                            {item.selectedNotes && <p>備註: ${item.selectedNotes}</p>}
+                                                          </div>
+                                                      </div>
+                                                    ))}
+                                                    </div>
+                                                </div>
+
+                                                {(Object.keys(aggregatedOptions.drinks).length > 0 || Object.keys(aggregatedOptions.sauces).length > 0 || Object.keys(aggregatedOptions.addons).length > 0) && (
+                                                    <div className="bg-slate-100 rounded-lg p-3 text-xs">
+                                                        <h5 className="font-bold text-slate-600 border-b pb-1 mb-2">訂單選項總覽</h5>
+                                                        <div className="text-slate-700 space-y-1">
+                                                            {Object.keys(aggregatedOptions.drinks).length > 0 && <p><span className="font-semibold">飲料:</span> ${Object.entries(aggregatedOptions.drinks).map(([name, q]) => `${name} x${q}`).join(', ')}</p>}
+                                                            {Object.keys(aggregatedOptions.sauces).length > 0 && <p><span className="font-semibold">沾醬:</span> ${Object.entries(aggregatedOptions.sauces).map(([name, q]) => `${name} x${q}`).join(', ')}</p>}
+                                                            {Object.keys(aggregatedOptions.addons).length > 0 && (
+                                                                <div>
+                                                                    <p className="font-semibold">加購:</p>
+                                                                    <ul className="list-disc list-inside pl-2">
+                                                                    {Object.entries(aggregatedOptions.addons).map(([name, {quantity, price}]) => (
+                                                                        <li key={name}>{name} x{quantity} (+${price * quantity})</li>
+                                                                    ))}
+                                                                    </ul>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="flex justify-between items-center border-t border-slate-300 pt-2 mt-3">
+                                            <p className="text-lg font-bold">總金額:</p>
+                                            <p className="text-xl font-bold text-green-700">${orderDetails.totalAmount}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 justify-center mt-4 no-print">
+                                    <button onClick={handleLineShare} className="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600">LINE 分享</button>
+                                    <button onClick={handlePrint} className="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600">列印訂單</button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                    <div className="p-5 border-t bg-slate-50 flex-shrink-0 no-print">
+                        <button onClick={handleNewOrder} className="w-full bg-green-600 text-white font-bold py-3 px-6 rounded-lg hover:bg-green-700 transition-colors">
+                            繼續點餐
+                        </button>
+                    </div>
                 </div>
-              </div>
             );
-          }
-
-          return (
-            <div className="bg-white rounded-lg shadow-md p-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-                <h2 className="text-2xl font-bold text-slate-800">銷售統計</h2>
-                <div className="flex gap-2">
-                  <button 
-                    onClick={() => setDateRange('week')} 
-                    className={`px-4 py-2 rounded-lg font-medium ${dateRange === 'week' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700'}`}
-                  >
-                    最近一週
-                  </button>
-                  <button 
-                    onClick={() => setDateRange('month')} 
-                    className={`px-4 py-2 rounded-lg font-medium ${dateRange === 'month' ? 'bg-green-600 text-white' : 'bg-slate-200 text-slate-700'}`}
-                  >
-                    最近一月
-                  </button>
-                  <button 
-                    onClick={fetchSalesData}
-                    className="flex items-center gap-2 px-4 py-2 bg-slate-200 text-slate-700 rounded-lg hover:bg-slate-300"
-                  >
-                    <RefreshIcon className="h-4 w-4" />
-                    刷新
-                  </button>
-                </div>
-              </div>
-
-              {salesData ? (
-                <>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                    <div className="bg-green-50 p-6 rounded-lg border border-green-200">
-                      <h3 className="text-lg font-semibold text-green-800 mb-2">總營業額</h3>
-                      <p className="text-3xl font-bold text-green-700">${salesData.totalRevenue.toLocaleString()}</p>
-                    </div>
-                    <div className="bg-blue-50 p-6 rounded-lg border border-blue-200">
-                      <h3 className="text-lg font-semibold text-blue-800 mb-2">總訂單數</h3>
-                      <p className="text-3xl font-bold text-blue-700">{salesData.totalOrders}</p>
-                    </div>
-                    <div className="bg-purple-50 p-6 rounded-lg border border-purple-200">
-                      <h3 className="text-lg font-semibold text-purple-800 mb-2">平均訂單金額</h3>
-                      <p className="text-3xl font-bold text-purple-700">${salesData.averageOrderValue}</p>
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                    <div>
-                      <canvas ref={revenueChartRef}></canvas>
-                    </div>
-                    <div>
-                      <canvas ref={topProductsChartRef}></canvas>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <div className="text-center py-12 text-slate-500">
-                  <p className="text-lg">無法載入銷售數據</p>
-                </div>
-              )}
-            </div>
-          );
         };
 
-        // 主應用組件
-        const App = () => {
-          const [activeTab, setActiveTab] = React.useState('orders');
-          const [orders, setOrders] = React.useState([]);
-          const [isLoading, setIsLoading] = React.useState(true);
-          const [sidebarOpen, setSidebarOpen] = React.useState(false);
+
+        const CartMainView = ({
+            onClose, cartItems, onUpdateQuantity, onRemoveItem, onEditItem, customerInfo, 
+            onInfoChange, totalPrice, handleCheckout, isCheckingOut, orderType, setOrderType, validationError
+        }) => {
+            const aggregatedOptions = React.useMemo(() => {
+                const drinks = {};
+                const sauces = {};
+                const addons = {};
+
+                cartItems.forEach(cartItem => {
+                    if (cartItem.selectedDrinks) {
+                        Object.entries(cartItem.selectedDrinks).forEach(([name, quantity]) => {
+                            drinks[name] = (drinks[name] || 0) + quantity;
+                        });
+                    }
+                    if (cartItem.selectedSauces) {
+                        cartItem.selectedSauces.forEach(sauce => {
+                            sauces[sauce.name] = (sauces[sauce.name] || 0) + sauce.quantity;
+                        });
+                    }
+                    if (cartItem.selectedAddons) {
+                        cartItem.selectedAddons.forEach(addon => {
+                            addons[addon.name] = {
+                                quantity: (addons[addon.name]?.quantity || 0) + addon.quantity,
+                                price: addon.price
+                            };
+                        });
+                    }
+                });
+
+                return { drinks, sauces, addons };
+            }, [cartItems]);
+
+            return (
+                <div className="flex flex-col h-full">
+                  <div className="flex justify-between items-center p-5 border-b">
+                    <h2 className="text-2xl font-bold text-slate-800">我的購物車</h2>
+                    <button onClick={onClose} className="text-slate-500 hover:text-slate-800"><CloseIcon /></button>
+                  </div>
+                  
+                  {cartItems.length === 0 ? (
+                    <div className="flex-grow flex flex-col justify-center items-center text-slate-500 p-4">
+                      <CartIcon className="w-24 h-24 mb-4 text-slate-300"/>
+                      <p className="text-lg">您的購物車是空的</p>
+                    </div>
+                  ) : (
+                    <>
+                    <div className="flex-grow overflow-y-auto">
+                      <div className="p-5 space-y-6">
+                        <div className="bg-slate-50 rounded-lg p-4">
+                            <h3 className="text-lg font-bold text-slate-700 mb-3 pb-2 border-b">餐點列表</h3>
+                            <div className="space-y-4">
+                            {cartItems.map((item, index) => (
+                              <div key={item.cartId} className="flex items-start gap-3">
+                                <div className="pt-1 font-semibold text-slate-500">{index + 1}.</div>
+                                <div className="flex-grow">
+                                  <button onClick={() => onEditItem(item.cartId)} className="font-semibold text-left hover:text-blue-600 hover:underline transition-colors focus:outline-none">
+                                      {item.item.name.replace(/半全餐|半套餐/g, '套餐')} <span className="font-normal text-slate-500">x{item.quantity}</span>
+                                  </button>
+                                  <div className="text-sm text-slate-600 mt-1 space-y-0.5">
+                                    {item.selectedDonenesses && Object.keys(item.selectedDonenesses).length > 0 && <p>熟度: ${Object.entries(item.selectedDonenesses).map(([d, q]) => `${d}x${q}`).join(', ')}</p>}
+                                    {item.selectedNotes && <p className="text-blue-600">備註: ${item.selectedNotes}</p>}
+                                  </div>
+                                </div>
+                                <div className="text-right flex flex-col items-end">
+                                  <p className="font-bold text-lg">${item.totalPrice}</p>
+                                  <div className="flex items-center gap-2 mt-3">
+                                    <button onClick={() => onUpdateQuantity(item.cartId, item.quantity - 1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300"><MinusIcon className="h-4 w-4" /></button>
+                                    <span className="font-semibold w-8 text-center">{item.quantity}</span>
+                                    <button onClick={() => onUpdateQuantity(item.cartId, item.quantity + 1)} className="p-1 rounded-full bg-slate-200 hover:bg-slate-300"><PlusIcon className="h-4 w-4" /></button>
+                                    <button onClick={() => onRemoveItem(item.cartId)} className="text-red-500 hover:text-red-700 ml-1"><TrashIcon className="h-5 w-5"/></button>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                            </div>
+                        </div>
+
+                        <div className="bg-slate-100 rounded-lg p-4 space-y-3">
+                            <h3 className="text-md font-bold text-slate-600 border-b pb-2">訂單選項總覽</h3>
+                            <div className="text-sm text-slate-700 space-y-1">
+                                {Object.keys(aggregatedOptions.drinks).length > 0 && <p><span className="font-semibold">飲料:</span> ${Object.entries(aggregatedOptions.drinks).map(([name, q]) => `${name} x${q}`).join(', ')}</p>}
+                                {Object.keys(aggregatedOptions.sauces).length > 0 && <p><span className="font-semibold">沾醬:</span> ${Object.entries(aggregatedOptions.sauces).map(([name, q]) => `${name} x${q}`).join(', ')}</p>}
+                                {Object.keys(aggregatedOptions.addons).length > 0 && (
+                                    <div>
+                                        <p className="font-semibold">加購:</p>
+                                        <ul className="list-disc list-inside pl-2">
+                                        {Object.entries(aggregatedOptions.addons).map(([name, {quantity, price}]) => (
+                                            <li key={name}>{name} x{quantity} (+${price * quantity})</li>
+                                        ))}
+                                        </ul>
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+
+                      </div>
+                      <div className="p-5 border-t bg-slate-100">
+                        <div className="mb-4">
+                            <h3 className="text-lg font-semibold mb-2 text-slate-700">用餐方式</h3>
+                            <div className="flex w-full bg-slate-200 rounded-lg p-1">
+                                <button onClick={() => setOrderType('內用')} className={`flex-1 py-2 rounded-md font-semibold transition-colors ${orderType === '內用' ? 'bg-green-600 text-white shadow' : 'text-slate-600'}`}>內用</button>
+                                <button onClick={() => setOrderType('外帶')} className={`flex-1 py-2 rounded-md font-semibold transition-colors ${orderType === '外帶' ? 'bg-green-600 text-white shadow' : 'text-slate-600'}`}>外帶</button>
+                            </div>
+                        </div>
+
+                        <h3 className="text-lg font-semibold mb-3 text-slate-700">顧客資訊</h3>
+                        <div className="space-y-3">
+                          <input type="text" placeholder="姓名 *" value={customerInfo.name} onChange={(e) => onInfoChange('name', e.target.value)} className="w-full p-2 border border-slate-300 rounded-md" required />
+                          <input type="tel" placeholder="電話 * (10位數字)" value={customerInfo.phone} onChange={(e) => onInfoChange('phone', e.target.value)} className="w-full p-2 border border-slate-300 rounded-md" pattern="[0-9]{10}" required />
+                          {orderType === '內用' && (
+                            <input type="text" placeholder="桌號 (可選)" value={customerInfo.tableNumber} onChange={(e) => onInfoChange('tableNumber', e.target.value)} className="w-full p-2 border border-slate-300 rounded-md" />
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="p-5 border-t bg-slate-50">
+                      <div className="flex justify-between items-center mb-4">
+                        <span className="text-xl font-medium">總計</span>
+                        <span className="text-3xl font-bold text-green-700">${totalPrice}</span>
+                      </div>
+                      {validationError && (
+                          <div className="bg-red-100 border-l-4 border-red-500 text-red-700 p-3 mb-3 rounded-md text-center" role="alert">
+                            <p className="font-bold">{validationError}</p>
+                          </div>
+                      )}
+                      <button onClick={handleCheckout} disabled={isCheckingOut} className="w-full bg-green-600 text-white font-bold py-4 px-4 rounded-lg hover:bg-green-700 transition-colors text-lg disabled:bg-slate-400 disabled:cursor-not-allowed">
+                        {isCheckingOut ? "提交中..." : "確認訂單"}
+                      </button>
+                    </div>
+                    </>
+                  )}
+                </div>
+            )
+        };
+
+        const Cart = ({ isOpen, onClose, cartItems, onUpdateQuantity, onRemoveItem, onEditItem, onSubmitOrder }) => {
+          const [isCheckingOut, setIsCheckingOut] = React.useState(false);
+          const [customerInfo, setCustomerInfo] = React.useState({ name: '', phone: '', tableNumber: '' });
+          const [orderType, setOrderType] = React.useState('內用');
+          const [orderSubmitted, setOrderSubmitted] = React.useState(false);
+          const [submittedOrderId, setSubmittedOrderId] = React.useState(null);
+          const [submittedOrderData, setSubmittedOrderData] = React.useState(null);
+          const [validationError, setValidationError] = React.useState(null);
+
 
           React.useEffect(() => {
-            fetchOrders();
-            // 每30秒自動刷新訂單
-            const interval = setInterval(fetchOrders, 30000);
-            return () => clearInterval(interval);
-          }, []);
-
-          const fetchOrders = async () => {
-            setIsLoading(true);
-            const result = await apiService.getAllOrders();
-            if (result.success && result.orders) {
-              setOrders(result.orders);
-            } else {
-              // 使用模擬數據
-              setOrders(generateMockOrders());
+            if (!isOpen) {
+                setTimeout(() => {
+                    setOrderSubmitted(false);
+                    setIsCheckingOut(false);
+                    setSubmittedOrderId(null);
+                    setSubmittedOrderData(null);
+                    setOrderType('內用'); // Reset on close
+                    setValidationError(null);
+                }, 300);
             }
-            setIsLoading(false);
-          };
-
-          const generateMockOrders = () => {
-            const statuses = ['確認中', '準備中', '可以取餐', '完成', '取消'];
-            const orderTypes = ['內用', '外帶'];
-            const customers = [
-              { name: '王小明', phone: '0912345678' },
-              { name: '陳小美', phone: '0923456789' },
-              { name: '李大華', phone: '0934567890' },
-              { name: '林小芳', phone: '0945678901' },
-              { name: '張大偉', phone: '0956789012' }
-            ];
-            
-            const menuItems = [
-              { name: '香煎海盜牛排套餐 7oz', price: 299 },
-              { name: '香煎海盜牛排套餐 14oz', price: 399 },
-              { name: '香煎特選板腱套餐 10oz', price: 399 },
-              { name: '香煎老饕上蓋套餐 7oz', price: 399 },
-              { name: '香煎紐菲力套餐 7oz', price: 499 },
-              { name: '香煎櫻桃鴨胸套餐 10oz', price: 320 },
-              { name: '香煎鮮嫩鱸魚套餐 10oz', price: 320 },
-              { name: '香煎鮮嫩雞腿套餐 10oz', price: 250 },
-              { name: '香煎美味豬排套餐 10oz', price: 299 },
-              { name: '英式炸魚套餐 10oz', price: 250 }
-            ];
-
-            const mockOrders = [];
-            for (let i = 0; i < 15; i++) {
-              const customer = customers[Math.floor(Math.random() * customers.length)];
-              const status = statuses[Math.floor(Math.random() * statuses.length)];
-              const orderType = orderTypes[Math.floor(Math.random() * orderTypes.length)];
-              const itemCount = Math.floor(Math.random() * 3) + 1;
-              
-              const items = [];
-              let totalAmount = 0;
-              
-              for (let j = 0; j < itemCount; j++) {
-                const item = menuItems[Math.floor(Math.random() * menuItems.length)];
-                const quantity = Math.floor(Math.random() * 2) + 1;
-                const itemTotal = item.price * quantity;
-                totalAmount += itemTotal;
-                
-                items.push({
-                  cartId: `item-${i}-${j}`,
-                  item: item,
-                  quantity: quantity,
-                  totalPrice: itemTotal,
-                  selectedDonenesses: item.name.includes('牛排') ? { '5分熟': quantity } : {},
-                  selectedDrinks: { '無糖紅茶': quantity },
-                  selectedSauces: [{ name: '黑胡椒', quantity: 1 }],
-                  selectedAddons: [],
-                  selectedNotes: ''
-                });
+          }, [isOpen]);
+          
+          React.useEffect(() => {
+              if (orderType === '外帶') {
+                  setCustomerInfo(prev => ({ ...prev, tableNumber: '' }));
               }
-              
-              mockOrders.push({
-                id: `ORD-${1000 + i}`,
-                customerName: customer.name,
-                customerPhone: customer.phone,
-                tableNumber: orderType === '內用' ? `T${Math.floor(Math.random() * 10) + 1}` : null,
-                orderType: orderType,
-                items: items,
-                totalAmount: totalAmount,
-                status: status,
-                timestamp: new Date(Date.now() - Math.floor(Math.random() * 7 * 24 * 60 * 60 * 1000)).toISOString()
-              });
+          }, [orderType]);
+          
+          const handleCustomerInfoChange = (field, value) => {
+              if (validationError) {
+                  setValidationError(null);
+              }
+              setCustomerInfo(prev => ({ ...prev, [field]: value }));
+          };
+
+          const totalPrice = React.useMemo(() => cartItems.reduce((total, item) => total + item.totalPrice, 0), [cartItems]);
+
+          const handleCheckout = async () => {
+            setValidationError(null);
+            if (!customerInfo.name.trim()) {
+              setValidationError('請填寫您的姓名');
+              return;
             }
-            
-            // 按時間排序，最新的在前
-            return mockOrders.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
-          };
+             if (!customerInfo.phone.trim()) {
+              setValidationError('請填寫您的電話');
+              return;
+            }
+            if (!/^[0-9]{10}$/.test(customerInfo.phone)) {
+                setValidationError('請輸入有效的手機號碼（10位數字）');
+                return;
+            }
 
-          const handleUpdateStatus = async (orderId, newStatus) => {
-            const result = await apiService.updateOrderStatus(orderId, newStatus);
-            if (result.success) {
-              setOrders(prevOrders => 
-                prevOrders.map(order => 
-                  order.id === orderId ? { ...order, status: newStatus } : order
-                )
-              );
-            } else {
-              alert('更新狀態失敗: ' + result.message);
+            setIsCheckingOut(true);
+            try {
+              const orderData = { items: cartItems, totalPrice, customerInfo, orderType };
+              const result = await onSubmitOrder(orderData);
+              if (result.success && result.orderId) {
+                setSubmittedOrderId(result.orderId);
+                setSubmittedOrderData(orderData);
+                setOrderSubmitted(true);
+              } else {
+                setValidationError('訂單提交失敗: ' + (result.message || '未知錯誤'));
+              }
+            } catch (error) {
+              setValidationError('訂單提交失敗: ' + error.message);
+            } finally {
+              setIsCheckingOut(false);
             }
           };
 
-          const toggleSidebar = () => {
-            setSidebarOpen(!sidebarOpen);
+          const handleNewOrder = () => {
+            onClose();
           };
-
+          
           return (
-            <div className="min-h-screen bg-slate-100 text-slate-800">
-              {/* 側邊欄 */}
-              <div className={`sidebar fixed inset-y-0 left-0 z-50 w-64 bg-slate-800 text-white ${sidebarOpen ? 'open' : ''}`}>
-                <div className="p-6">
-                  <h1 className="text-2xl font-bold">美味廚房</h1>
-                  <p className="text-slate-400 text-sm mt-1">店家管理系統</p>
-                </div>
-                <nav className="mt-6">
-                  <button 
-                    onClick={() => { setActiveTab('orders'); setSidebarOpen(false); }}
-                    className={`flex items-center w-full px-6 py-3 text-left ${activeTab === 'orders' ? 'bg-slate-700' : 'hover:bg-slate-700'}`}
-                  >
-                    <OrdersIcon className="h-5 w-5 mr-3" />
-                    <span>訂單管理</span>
-                  </button>
-                  <button 
-                    onClick={() => { setActiveTab('analytics'); setSidebarOpen(false); }}
-                    className={`flex items-center w-full px-6 py-3 text-left ${activeTab === 'analytics' ? 'bg-slate-700' : 'hover:bg-slate-700'}`}
-                  >
-                    <AnalyticsIcon className="h-5 w-5 mr-3" />
-                    <span>銷售統計</span>
-                  </button>
-                </nav>
-              </div>
-
-              {/* 主內容區 */}
-              <div className={`md:ml-64 transition-all duration-300`}>
-                {/* 頂部欄 */}
-                <header className="bg-white shadow-sm">
-                  <div className="flex items-center justify-between p-4">
-                    <button 
-                      onClick={toggleSidebar}
-                      className="md:hidden p-2 rounded-md text-slate-600 hover:bg-slate-100"
-                    >
-                      <MenuIcon className="h-6 w-6" />
-                    </button>
-                    <div className="flex items-center gap-4">
-                      <h1 className="text-xl font-semibold text-slate-800">
-                        {activeTab === 'orders' ? '訂單管理' : '銷售統計'}
-                      </h1>
-                      {activeTab === 'orders' && (
-                        <button 
-                          onClick={fetchOrders}
-                          disabled={isLoading}
-                          className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium disabled:opacity-50"
-                        >
-                          <RefreshIcon className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
-                          <span>{isLoading ? '刷新中' : '刷新'}</span>
-                        </button>
-                      )}
-                    </div>
-                    <div className="text-sm text-slate-500">
-                      {new Date().toLocaleDateString('zh-TW', { 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric',
-                        weekday: 'long'
-                      })}
-                    </div>
-                  </div>
-                </header>
-
-                {/* 主內容 */}
-                <main className="p-4 md:p-6">
-                  {activeTab === 'orders' ? (
-                    <OrdersManagement 
-                      orders={orders} 
-                      onUpdateStatus={handleUpdateStatus}
-                      isLoading={isLoading}
+            <>
+              <div className={`fixed inset-0 bg-black bg-opacity-50 z-30 transition-opacity ${isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} onClick={onClose} />
+              <div className={`fixed top-0 right-0 h-full w-full max-w-md bg-white shadow-lg z-40 transform transition-transform duration-300 ease-in-out ${isOpen ? 'translate-x-0' : 'translate-x-full'}`}>
+                {orderSubmitted ? 
+                    <CartSuccessView 
+                        handleNewOrder={handleNewOrder} 
+                        orderId={submittedOrderId} 
+                        orderData={submittedOrderData}
+                    /> : 
+                    <CartMainView 
+                        onClose={onClose}
+                        cartItems={cartItems}
+                        onUpdateQuantity={onUpdateQuantity}
+                        onRemoveItem={onRemoveItem}
+                        onEditItem={onEditItem}
+                        customerInfo={customerInfo}
+                        onInfoChange={handleCustomerInfoChange}
+                        orderType={orderType}
+                        setOrderType={setOrderType}
+                        totalPrice={totalPrice}
+                        handleCheckout={handleCheckout}
+                        isCheckingOut={isCheckingOut}
+                        validationError={validationError}
                     />
-                  ) : (
-                    <SalesAnalytics />
-                  )}
-                </main>
+                }
               </div>
-
-              {/* 移動設備側邊欄遮罩 */}
-              {sidebarOpen && (
-                <div 
-                  className="fixed inset-0 bg-black bg-opacity-50 z-40 md:hidden"
-                  onClick={() => setSidebarOpen(false)}
-                ></div>
-              )}
-            </div>
+            </>
           );
         };
 
-        // 渲染應用
+        // Admin Components
+        const AdminSidebar = ({ activeTab, setActiveTab, isOpen, onClose }) => {
+            return (
+                <>
+                    <div className={`overlay ${isOpen ? 'open' : ''}`} onClick={onClose}></div>
+                    <div className={`sidebar bg-slate-800 text-white w-64 flex-shrink-0 ${isOpen ? 'open' : ''}`}>
+                        <div className="p-4 border-b border-slate-700">
+                            <h2 className="text-xl font-bold">美味廚房管理系統</h2>
+                        </div>
+                        <nav className="p-4 space-y-2">
+                            <button 
+                                onClick={() => setActiveTab('orders')} 
+                                className={`w-full text-left p-3 rounded-lg flex items-center gap-3 ${activeTab === 'orders' ? 'bg-green-600' : 'hover:bg-slate-700'}`}
+                            >
+                                <CartIcon className="h-5 w-5" />
+                                <span>訂單管理</span>
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('analytics')} 
+                                className={`w-full text-left p-3 rounded-lg flex items-center gap-3 ${activeTab === 'analytics' ? 'bg-green-600' : 'hover:bg-slate-700'}`}
+                            >
+                                <ChartIcon className="h-5 w-5" />
+                                <span>銷售統計</span>
+                            </button>
+                            <button 
+                                onClick={() => setActiveTab('menu')} 
+                                className={`w-full text-left p-3 rounded-lg flex items-center gap-3 ${activeTab === 'menu' ? 'bg-green-600' : 'hover:bg-slate-700'}`}
+                            >
+                                <SettingsIcon className="h-5 w-5" />
+                                <span>菜單管理</span>
+                            </button>
+                        </nav>
+                    </div>
+                </>
+            );
+        };
+
+        const OrdersManagement = ({ orders, onUpdateStatus }) => {
+            const [filterStatus, setFilterStatus] = React.useState('全部');
+            const [searchTerm, setSearchTerm] = React.useState('');
+            
+            const filteredOrders = React.useMemo(() => {
+                return orders.filter(order => {
+                    const matchesStatus = filterStatus === '全部' || order.status === filterStatus;
+                    const matchesSearch = 
+                        order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                        order.customerPhone.includes(searchTerm);
+                    
+                    return matchesStatus && matchesSearch;
+                });
+            }, [orders, filterStatus, searchTerm]);
+
+            const getStatusColor = (status) => {
+                switch (status) {
+                    case '確認中': return 'bg-blue-500 text-white';
+                    case '準備中': return 'bg-yellow-500 text-white';
+                    case '可以取餐': return 'bg-purple-500 text-white';
+                    case '完成': return 'bg-green-600 text-white';
+                    default: return 'bg-slate-500 text-white';
+                }
+            };
+
+            const handleStatusChange = async (orderId, newStatus) => {
+                const result = await onUpdateStatus(orderId, newStatus);
+                if (!result.success) {
+                    alert('更新狀態失敗: ' + result.message);
+                }
+            };
+
+            return (
+                <div className="p-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <h2 className="text-2xl font-bold text-slate-800">訂單管理</h2>
+                        <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
+                            <input
+                                type="text"
+                                placeholder="搜尋訂單..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                            />
+                            <select
+                                value={filterStatus}
+                                onChange={(e) => setFilterStatus(e.target.value)}
+                                className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                            >
+                                <option value="全部">全部狀態</option>
+                                <option value="確認中">確認中</option>
+                                <option value="準備中">準備中</option>
+                                <option value="可以取餐">可以取餐</option>
+                                <option value="完成">完成</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="bg-white rounded-lg shadow overflow-hidden">
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-slate-200">
+                                <thead className="bg-slate-50">
+                                    <tr>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">訂單編號</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">顧客資訊</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">類型</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">金額</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">狀態</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">時間</th>
+                                        <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-slate-200">
+                                    {filteredOrders.map((order) => (
+                                        <tr key={order.id} className="hover:bg-slate-50">
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-slate-900">{order.id}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                                                <div>{order.customerName}</div>
+                                                <div>{order.customerPhone}</div>
+                                                {order.tableNumber && <div>桌號: {order.tableNumber}</div>}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">{order.orderType}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-semibold text-green-600">${order.totalAmount}</td>
+                                            <td className="px-6 py-4 whitespace-nowrap">
+                                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(order.status)}`}>
+                                                    {order.status}
+                                                </span>
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                                                {new Date(order.timestamp).toLocaleString('zh-TW')}
+                                            </td>
+                                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                                                <select
+                                                    value={order.status}
+                                                    onChange={(e) => handleStatusChange(order.id, e.target.value)}
+                                                    className="text-xs border border-slate-300 rounded px-2 py-1 focus:ring-2 focus:ring-green-500 outline-none"
+                                                >
+                                                    <option value="確認中">確認中</option>
+                                                    <option value="準備中">準備中</option>
+                                                    <option value="可以取餐">可以取餐</option>
+                                                    <option value="完成">完成</option>
+                                                </select>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                        {filteredOrders.length === 0 && (
+                            <div className="text-center py-8 text-slate-500">
+                                沒有找到符合條件的訂單
+                            </div>
+                        )}
+                    </div>
+                </div>
+            );
+        };
+
+        const AnalyticsDashboard = ({ orders }) => {
+            const [timeRange, setTimeRange] = React.useState('today');
+            
+            const filteredOrders = React.useMemo(() => {
+                const now = new Date();
+                let startDate;
+                
+                switch (timeRange) {
+                    case 'today':
+                        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                        break;
+                    case 'week':
+                        startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+                        break;
+                    case 'month':
+                        startDate = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+                        break;
+                    default:
+                        startDate = new Date(0); // All time
+                }
+                
+                return orders.filter(order => new Date(order.timestamp) >= startDate);
+            }, [orders, timeRange]);
+
+            const stats = React.useMemo(() => {
+                const totalRevenue = filteredOrders.reduce((sum, order) => sum + order.totalAmount, 0);
+                const totalOrders = filteredOrders.length;
+                const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+                
+                // Popular items
+                const itemCounts = {};
+                filteredOrders.forEach(order => {
+                    if (order.items && Array.isArray(order.items)) {
+                        order.items.forEach(item => {
+                            const itemName = item.item.name;
+                            itemCounts[itemName] = (itemCounts[itemName] || 0) + item.quantity;
+                        });
+                    }
+                });
+                
+                const popularItems = Object.entries(itemCounts)
+                    .sort(([,a], [,b]) => b - a)
+                    .slice(0, 5);
+                
+                // Revenue by hour
+                const revenueByHour = Array(24).fill(0);
+                filteredOrders.forEach(order => {
+                    const hour = new Date(order.timestamp).getHours();
+                    revenueByHour[hour] += order.totalAmount;
+                });
+                
+                return {
+                    totalRevenue,
+                    totalOrders,
+                    avgOrderValue,
+                    popularItems,
+                    revenueByHour
+                };
+            }, [filteredOrders]);
+
+            React.useEffect(() => {
+                // Initialize chart
+                const ctx = document.getElementById('revenueChart');
+                if (ctx) {
+                    const chart = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: Array.from({length: 24}, (_, i) => `${i}:00`),
+                            datasets: [{
+                                label: '營業額 (元)',
+                                data: stats.revenueByHour,
+                                backgroundColor: 'rgba(34, 197, 94, 0.5)',
+                                borderColor: 'rgba(34, 197, 94, 1)',
+                                borderWidth: 1
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            scales: {
+                                y: {
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                    
+                    return () => chart.destroy();
+                }
+            }, [stats.revenueByHour]);
+
+            return (
+                <div className="p-6">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
+                        <h2 className="text-2xl font-bold text-slate-800">銷售統計</h2>
+                        <select
+                            value={timeRange}
+                            onChange={(e) => setTimeRange(e.target.value)}
+                            className="px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+                        >
+                            <option value="today">今日</option>
+                            <option value="week">近一週</option>
+                            <option value="month">近一個月</option>
+                            <option value="all">全部</option>
+                        </select>
+                    </div>
+
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                        <div className="bg-white p-6 rounded-lg shadow">
+                            <h3 className="text-lg font-semibold text-slate-700 mb-2">總營業額</h3>
+                            <p className="text-3xl font-bold text-green-600">${stats.totalRevenue}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow">
+                            <h3 className="text-lg font-semibold text-slate-700 mb-2">訂單數量</h3>
+                            <p className="text-3xl font-bold text-blue-600">{stats.totalOrders}</p>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow">
+                            <h3 className="text-lg font-semibold text-slate-700 mb-2">平均訂單金額</h3>
+                            <p className="text-3xl font-bold text-purple-600">${Math.round(stats.avgOrderValue)}</p>
+                        </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                        <div className="bg-white p-6 rounded-lg shadow">
+                            <h3 className="text-lg font-semibold text-slate-700 mb-4">營業額時段分析</h3>
+                            <canvas id="revenueChart" height="250"></canvas>
+                        </div>
+                        <div className="bg-white p-6 rounded-lg shadow">
+                            <h3 className="text-lg font-semibold text-slate-700 mb-4">熱門商品排行</h3>
+                            <div className="space-y-3">
+                                {stats.popularItems.map(([itemName, count], index) => (
+                                    <div key={itemName} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex items-center justify-center w-6 h-6 bg-green-100 text-green-800 rounded-full text-sm font-bold">
+                                                {index + 1}
+                                            </span>
+                                            <span className="font-medium text-slate-800">{itemName}</span>
+                                        </div>
+                                        <span className="font-semibold text-slate-600">{count} 份</span>
+                                    </div>
+                                ))}
+                                {stats.popularItems.length === 0 && (
+                                    <p className="text-slate-500 text-center py-4">暫無資料</p>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const MenuManagement = ({ menuData, addons, onUpdateItem }) => {
+            const [editingItem, setEditingItem] = React.useState(null);
+            const [isModalOpen, setIsModalOpen] = React.useState(false);
+
+            const handleSaveItem = async (itemId, updates) => {
+                const result = await onUpdateItem(itemId, updates);
+                if (result.success) {
+                    setEditingItem(null);
+                    setIsModalOpen(false);
+                } else {
+                    alert('更新失敗: ' + result.message);
+                }
+            };
+
+            return (
+                <div className="p-6">
+                    <h2 className="text-2xl font-bold text-slate-800 mb-6">菜單管理</h2>
+                    
+                    <div className="space-y-8">
+                        {menuData.map((category) => (
+                            <div key={category.title} className="bg-white rounded-lg shadow">
+                                <div className="p-4 border-b border-slate-200">
+                                    <h3 className="text-xl font-semibold text-slate-800">{category.title}</h3>
+                                    <p className="text-sm text-slate-500">{category.description}</p>
+                                </div>
+                                <div className="p-4">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {category.items.map((item) => (
+                                            <div key={item.id} className="border border-slate-200 rounded-lg p-4">
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <h4 className="font-semibold text-slate-800">{item.name}</h4>
+                                                    <span className={`px-2 py-1 text-xs rounded-full ${item.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                                                        {item.isAvailable ? '供應中' : '已售完'}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-slate-600 mb-2">{item.weight}</p>
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-lg font-bold text-green-600">${item.price}</span>
+                                                    <button
+                                                        onClick={() => {
+                                                            setEditingItem(item);
+                                                            setIsModalOpen(true);
+                                                        }}
+                                                        className="p-2 text-slate-600 hover:text-slate-800"
+                                                    >
+                                                        <PencilIcon className="h-4 w-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {isModalOpen && editingItem && (
+                        <EditMenuItemModal
+                            item={editingItem}
+                            onClose={() => {
+                                setEditingItem(null);
+                                setIsModalOpen(false);
+                            }}
+                            onSave={handleSaveItem}
+                        />
+                    )}
+                </div>
+            );
+        };
+
+        const EditMenuItemModal = ({ item, onClose, onSave }) => {
+            const [price, setPrice] = React.useState(item.price);
+            const [isAvailable, setIsAvailable] = React.useState(item.isAvailable);
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                onSave(item.id, { price, isAvailable });
+            };
+
+            return (
+                <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
+                    <div className="bg-white rounded-lg shadow-2xl w-full max-w-md">
+                        <div className="p-6 border-b">
+                            <h3 className="text-xl font-bold text-slate-800">編輯菜單項目</h3>
+                            <p className="text-slate-600">{item.name}</p>
+                        </div>
+                        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-slate-700 mb-2">價格</label>
+                                <input
+                                    type="number"
+                                    value={price}
+                                    onChange={(e) => setPrice(Number(e.target.value))}
+                                    className="w-full p-2 border border-slate-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none"
+                                    required
+                                />
+                            </div>
+                            <div>
+                                <label className="flex items-center">
+                                    <input
+                                        type="checkbox"
+                                        checked={isAvailable}
+                                        onChange={(e) => setIsAvailable(e.target.checked)}
+                                        className="rounded border-slate-300 text-green-600 focus:ring-green-500"
+                                    />
+                                    <span className="ml-2 text-sm text-slate-700">供應中</span>
+                                </label>
+                            </div>
+                            <div className="flex gap-3 pt-4">
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="flex-1 py-2 px-4 border border-slate-300 rounded-md text-slate-700 hover:bg-slate-50 transition-colors"
+                                >
+                                    取消
+                                </button>
+                                <button
+                                    type="submit"
+                                    className="flex-1 py-2 px-4 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
+                                >
+                                    儲存
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            );
+        };
+
+        const AdminPanel = ({ onBack }) => {
+            const [activeTab, setActiveTab] = React.useState('orders');
+            const [orders, setOrders] = React.useState([]);
+            const [menuData, setMenuData] = React.useState([]);
+            const [addons, setAddons] = React.useState([]);
+            const [loading, setLoading] = React.useState(true);
+            const [sidebarOpen, setSidebarOpen] = React.useState(false);
+
+            React.useEffect(() => {
+                const loadData = async () => {
+                    setLoading(true);
+                    try {
+                        const [ordersResult, menuResult] = await Promise.all([
+                            apiService.getAllOrders(),
+                            apiService.getMenuAndAddons()
+                        ]);
+                        
+                        if (ordersResult.success) {
+                            setOrders(ordersResult.orders);
+                        }
+                        
+                        if (menuResult.success) {
+                            setMenuData(menuResult.menu);
+                            setAddons(menuResult.addons);
+                        }
+                    } catch (error) {
+                        console.error('Failed to load admin data:', error);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                
+                loadData();
+                
+                // Refresh data every 30 seconds
+                const interval = setInterval(loadData, 30000);
+                return () => clearInterval(interval);
+            }, []);
+
+            const handleUpdateStatus = async (orderId, status) => {
+                const result = await apiService.updateOrderStatus(orderId, status);
+                if (result.success) {
+                    setOrders(prev => prev.map(order => 
+                        order.id === orderId ? { ...order, status } : order
+                    ));
+                }
+                return result;
+            };
+
+            const handleUpdateMenuItem = async (itemId, updates) => {
+                const result = await apiService.updateMenuItem(itemId, updates);
+                if (result.success) {
+                    setMenuData(prev => prev.map(category => ({
+                        ...category,
+                        items: category.items.map(item => 
+                            item.id === itemId ? { ...item, ...updates } : item
+                        )
+                    })));
+                }
+                return result;
+            };
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex flex-col justify-center items-center bg-slate-100">
+                        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-green-700"></div>
+                        <p className="mt-4 text-slate-600 text-lg">正在載入管理資料...</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-slate-100 flex">
+                    <AdminSidebar 
+                        activeTab={activeTab} 
+                        setActiveTab={setActiveTab}
+                        isOpen={sidebarOpen}
+                        onClose={() => setSidebarOpen(false)}
+                    />
+                    
+                    <div className="flex-1 flex flex-col">
+                        <header className="bg-white shadow-sm border-b border-slate-200">
+                            <div className="flex items-center justify-between p-4">
+                                <div className="flex items-center gap-4">
+                                    <button 
+                                        onClick={() => setSidebarOpen(true)}
+                                        className="lg:hidden p-2 text-slate-600 hover:text-slate-800"
+                                    >
+                                        <MenuIcon className="h-6 w-6" />
+                                    </button>
+                                    <h1 className="text-xl font-semibold text-slate-800">管理後台</h1>
+                                </div>
+                                <button
+                                    onClick={onBack}
+                                    className="px-4 py-2 bg-slate-600 text-white rounded-lg hover:bg-slate-700 transition-colors"
+                                >
+                                    返回點餐
+                                </button>
+                            </div>
+                        </header>
+                        
+                        <main className="flex-1 overflow-auto">
+                            {activeTab === 'orders' && (
+                                <OrdersManagement 
+                                    orders={orders} 
+                                    onUpdateStatus={handleUpdateStatus}
+                                />
+                            )}
+                            {activeTab === 'analytics' && (
+                                <AnalyticsDashboard orders={orders} />
+                            )}
+                            {activeTab === 'menu' && (
+                                <MenuManagement 
+                                    menuData={menuData}
+                                    addons={addons}
+                                    onUpdateItem={handleUpdateMenuItem}
+                                />
+                            )}
+                        </main>
+                    </div>
+                </div>
+            );
+        };
+
+        // From App.tsx
+        const App = () => {
+            const [cart, setCart] = React.useState([]);
+            const [isCartOpen, setIsCartOpen] = React.useState(false);
+            const [selectedItem, setSelectedItem] = React.useState(null);
+            const [editingCartItem, setEditingCartItem] = React.useState(null);
+            const [isQueryModalOpen, setIsQueryModalOpen] = React.useState(false);
+            const [isAdminMode, setIsAdminMode] = React.useState(false);
+
+            const [menuData, setMenuData] = React.useState([]);
+            const [addons, setAddons] = React.useState([]);
+            const [loading, setLoading] = React.useState(true);
+            const [isRefreshing, setIsRefreshing] = React.useState(false);
+            const [notification, setNotification] = React.useState(null);
+
+            const fetchData = React.useCallback(async () => {
+                setNotification(null);
+                const { menu, addons, from } = await apiService.getMenuAndAddons();
+
+                if (from === 'api' && (!menu || menu.length === 0 || menu.every(cat => cat.items.length === 0))) {
+                    setMenuData(MENU_DATA); // Use fallback data
+                    setAddons(ADDONS);
+                    setNotification('成功連接伺服器，但菜單是空的。請檢查後台 Google Sheet 是否已填入資料，或執行「一鍵設定工作表」。');
+                } else {
+                    setMenuData(menu);
+                    setAddons(addons);
+                    if (from === 'fallback') {
+                        setNotification('無法連接伺服器，目前顯示的是離線菜單。');
+                    }
+                }
+            }, []);
+
+            React.useEffect(() => {
+                const initialLoad = async () => {
+                    setLoading(true);
+                    try {
+                        await fetchData();
+                    } catch (error) {
+                        console.error("An unexpected error occurred during initial load:", error);
+                    } finally {
+                        setLoading(false);
+                    }
+                };
+                initialLoad();
+            }, [fetchData]);
+
+            const handleRefresh = async () => {
+                setIsRefreshing(true);
+                await fetchData();
+                setIsRefreshing(false);
+            };
+
+            const handleSelectItem = (item, category) => {
+                if (!item.isAvailable) return;
+                setSelectedItem({ item, category });
+            };
+
+            const handleCloseModal = () => {
+                setSelectedItem(null);
+                setEditingCartItem(null);
+            };
+            
+            const handleEditItem = (cartId) => {
+                const itemToEdit = cart.find(i => i.cartId === cartId);
+                if(itemToEdit) {
+                    const category = menuData.find(c => c.title === itemToEdit.categoryTitle) || { title: itemToEdit.categoryTitle, description: '' };
+                    setEditingCartItem(itemToEdit);
+                    setSelectedItem({ item: itemToEdit.item, category });
+                }
+            };
+            
+            const createCartItemObject = (item, quantity, options, category) => {
+                const { donenesses, drinks, addons, notes, sauces } = options;
+                
+                const generateStableObjectString = (obj) => {
+                    if (!obj || Object.keys(obj).length === 0) return '';
+                    return JSON.stringify(Object.fromEntries(Object.entries(obj).filter(([, val]) => val && Number(val) > 0).sort(([keyA], [keyB]) => keyA.localeCompare(keyB))));
+                };
+                
+                const totalAddonPrice = (addons || []).reduce((sum, addon) => sum + (addon.price * addon.quantity), 0);
+                const totalPrice = item.price * quantity + totalAddonPrice;
+
+                const cartKeyFields = {
+                    id: item.id,
+                    donenesses: generateStableObjectString(donenesses),
+                    drinks: generateStableObjectString(drinks),
+                    notes: notes,
+                    addons: (addons || []).map((a) => `${a.id}:${a.quantity}`).sort().join(','),
+                    sauces: (sauces || []).map((s) => `${s.name}:${s.quantity}`).sort().join(','),
+                };
+                const cartKey = JSON.stringify(cartKeyFields);
+
+                return {
+                    cartKey,
+                    item,
+                    quantity,
+                    categoryTitle: category.title,
+                    selectedDonenesses: donenesses,
+                    selectedDrinks: drinks,
+                    selectedAddons: addons || [],
+                    selectedSauces: sauces || [],
+                    selectedNotes: notes,
+                    totalPrice,
+                };
+            };
+            
+            const handleConfirmSelection = (item, quantity, options, category) => {
+                const newOrUpdatedCartItem = createCartItemObject(item, quantity, options, category);
+
+                if (editingCartItem) {
+                    setCart(prevCart => prevCart.map(cartItem => 
+                        cartItem.cartId === editingCartItem.cartId 
+                        ? { ...newOrUpdatedCartItem, cartId: editingCartItem.cartId } 
+                        : cartItem
+                    ));
+                } else {
+                     setCart(prevCart => {
+                        const existingItemIndex = prevCart.findIndex(cartItem => cartItem.cartKey === newOrUpdatedCartItem.cartKey);
+
+                        if (existingItemIndex > -1) {
+                            const updatedCart = [...prevCart];
+                            const existingItem = updatedCart[existingItemIndex];
+                            const newQuantity = existingItem.quantity + quantity;
+                            const totalAddonPrice = (existingItem.selectedAddons || []).reduce((sum, addon) => sum + (addon.price * addon.quantity), 0);
+                             const newTotalPrice = (item.price * newQuantity) + totalAddonPrice;
+
+
+                            updatedCart[existingItemIndex] = { 
+                                ...existingItem, 
+                                quantity: newQuantity,
+                                totalPrice: newTotalPrice
+                            };
+                            return updatedCart;
+                        } else {
+                             const finalCartItem = { 
+                                ...newOrUpdatedCartItem,
+                                cartId: `${newOrUpdatedCartItem.cartKey}-${Date.now()}`,
+                            };
+                            return [...prevCart, finalCartItem];
+                        }
+                    });
+                }
+            };
+            
+            const handleUpdateQuantity = (cartId, newQuantity) => {
+                setCart(prevCart => {
+                    if (newQuantity <= 0) {
+                        return prevCart.filter(item => item.cartId !== cartId);
+                    }
+                    return prevCart.map(item => {
+                        if (item.cartId === cartId) {
+                            const totalAddonPrice = item.selectedAddons.reduce((sum, addon) => sum + (addon.price * addon.quantity), 0);
+                            const newTotalPrice = (item.item.price * newQuantity) + totalAddonPrice;
+                            return { ...item, quantity: newQuantity, totalPrice: newTotalPrice };
+                        }
+                        return item;
+                    });
+                });
+            };
+
+            const handleRemoveFromCart = (cartId) => {
+                setCart(prevCart => prevCart.filter(item => item.cartId !== cartId));
+            };
+
+            const handleSubmitOrder = async (orderData) => {
+                const result = await apiService.submitOrder(orderData);
+                if (result.success) {
+                    setCart([]);
+                    if (result.orderId) {
+                        const savedOrders = JSON.parse(localStorage.getItem('steakhouse-orders') || '[]');
+                        if (!savedOrders.includes(result.orderId)) {
+                            savedOrders.unshift(result.orderId); // Add to the beginning
+                            localStorage.setItem('steakhouse-orders', JSON.stringify(savedOrders.slice(0, 10))); // Keep last 10
+                        }
+                    }
+                }
+                return result;
+            };
+            
+            const cartItemCount = React.useMemo(() => cart.reduce((total, item) => total + item.quantity, 0), [cart]);
+
+            if (isAdminMode) {
+                return <AdminPanel onBack={() => setIsAdminMode(false)} />;
+            }
+
+            if (loading) {
+                return (
+                    <div className="min-h-screen flex flex-col justify-center items-center bg-slate-100">
+                        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-green-700"></div>
+                        <p className="mt-4 text-slate-600 text-lg">正在載入菜單...</p>
+                    </div>
+                );
+            }
+
+            return (
+                <div className="min-h-screen bg-slate-100 text-slate-800">
+                     {notification && (
+                        <div className="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 text-center" role="alert">
+                            <p className="font-bold">{notification}</p>
+                        </div>
+                    )}
+                    <header className="bg-white shadow-md sticky top-0 z-20">
+                        <div className="container mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
+                            <h1 className="text-2xl sm:text-3xl font-bold text-green-800 tracking-wider">美味廚房點餐系統</h1>
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setIsQueryModalOpen(true)} className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium">
+                                    <SearchIcon className="h-4 w-4"/>
+                                    <span>查詢訂單</span>
+                                </button>
+                                <button onClick={handleRefresh} disabled={isRefreshing} className="flex items-center gap-2 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg hover:bg-slate-200 transition-colors text-sm font-medium disabled:opacity-50">
+                                    <RefreshIcon className={`h-4 w-4 ${isRefreshing ? 'animate-spin' : ''}`}/>
+                                    <span>{isRefreshing ? '刷新中' : '刷新'}</span>
+                                </button>
+                                <button onClick={() => setIsAdminMode(true)} className="flex items-center gap-2 px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm font-medium">
+                                    <SettingsIcon className="h-4 w-4"/>
+                                    <span>管理後台</span>
+                                </button>
+                            </div>
+                        </div>
+                    </header>
+
+                    <main className="container mx-auto p-4 md:p-6 lg:p-8">
+                        <Menu menuData={menuData} onSelectItem={handleSelectItem} />
+                    </main>
+
+                    <footer className="container mx-auto px-4 py-8 sm:px-6 lg:px-8 text-center text-slate-500 text-sm">
+                        <div className="border-t border-slate-200 pt-8 space-y-2">
+                            <p>＊店內最低消費為一份餐點</p>
+                            <p>＊不收服務費，用完餐請回收餐具</p>
+                            <p>＊用餐限九十分鐘請勿飲酒</p>
+                            <p>＊餐點內容以現場出餐為準，餐點現點現做請耐心等候</p>
+                        </div>
+                    </footer>
+
+                    {cartItemCount > 0 && (
+                        <button
+                            onClick={() => setIsCartOpen(true)}
+                            className="fixed bottom-6 right-6 lg:bottom-10 lg:right-10 flex items-center justify-center bg-green-700 text-white rounded-full shadow-lg hover:bg-green-800 transition-transform transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-700 focus:ring-opacity-50 h-16 w-16"
+                            aria-label={`查看購物車，共有 ${cartItemCount} 項商品`}
+                        >
+                            <CartIcon className="h-8 w-8" />
+                            <span className="absolute -top-1 -right-1 flex h-6 w-6 items-center justify-center rounded-full bg-red-500 text-xs font-bold">{cartItemCount}</span>
+                        </button>
+                    )}
+
+                    <Cart
+                        isOpen={isCartOpen}
+                        onClose={() => setIsCartOpen(false)}
+                        cartItems={cart}
+                        onUpdateQuantity={handleUpdateQuantity}
+                        onRemoveItem={handleRemoveFromCart}
+                        onEditItem={handleEditItem}
+                        onSubmitOrder={handleSubmitOrder}
+                    />
+
+                    {selectedItem && (
+                        <ItemModal
+                            selectedItem={selectedItem}
+                            editingItem={editingCartItem}
+                            addons={addons}
+                            onClose={handleCloseModal}
+                            onConfirmSelection={handleConfirmSelection}
+                        />
+                    )}
+                    
+                    <OrderQueryModal
+                        isOpen={isQueryModalOpen}
+                        onClose={() => setIsQueryModalOpen(false)}
+                    />
+                </div>
+            );
+        };
+
+        // From index.tsx
         const rootElement = document.getElementById('root');
         if (!rootElement) {
           throw new Error("Could not find root element to mount to");
