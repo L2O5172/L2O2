@@ -2,438 +2,193 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>美味廚房 - 店家管理系統</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <style>
-    body { font-family: 'Noto Sans TC', sans-serif; }
-    @media print {
-      body * { visibility: hidden; }
-      .print-area, .print-area * { visibility: visible; }
-      .print-area { position: absolute; left: 0; top: 0; width: 100%; }
-      .no-print { display: none !important; }
-      .print-area * { color: #000 !important; background: transparent !important; }
-    }
-    .status-confirming { @apply bg-blue-100 text-blue-800; }
-    .status-preparing { @apply bg-yellow-100 text-yellow-800; }
-    .status-ready { @apply bg-purple-100 text-purple-800; }
-    .status-completed { @apply bg-green-100 text-green-800; }
-  </style>
-  <script type="importmap">
-  {
-    "imports": {
-      "react": "https://aistudiocdn.com/react@^19.2.0",
-      "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.0/"
-    }
-  }
-  </script>
+  <style>body { font-family: 'Noto Sans TC', sans-serif; }</style>
+  <script src="https://unpkg.com/react@19/umd/react.development.js"></script>
+  <script src="https://unpkg.com/react-dom@19/umd/react-dom.development.js"></script>
   <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 </head>
-<body class="bg-gray-100 min-h-screen">
+<body class="bg-gray-100">
+  <div id="root"></div>
 
-<div id="root"></div>
+  <script type="text/babel">
+    const { useState, useEffect, useMemo } = React;
+    const API_URL = 'https://script.google.com/macros/s/AKfycbzMAk3nYwDvX-oEUA2Juz8HfLlN6ykcp-1Jow9gyr5ffw5xBmEDO9Lv5_Mi6xXq16Z2Ig/exec';
 
-<script type="text/babel" data-type="module">
-  import React from 'react';
-  import ReactDOM from 'react-dom/client';
-
-  const API_URL = 'https://script.google.com/macros/s/AKfycby1kfwzTbKolHplt9zBGATVJ2JcqF9T9rxsNLjev7lubmHQXISLT4AX0UOREaAn4GCMow/exec';
-  const ADMIN_PASSWORD = 'admin123'; // 可改成更安全的機制
-
-  // Icons
-  const PrinterIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z"/></svg>;
-  const ChartIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>;
-  const PackageIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></svg>;
-  const MenuIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16"/></svg>;
-  const LogoutIcon = () => <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1"/></svg>;
-
-  // API Service
-  const apiService = {
-    async fetchOrders() {
-      const res = await fetch(`${API_URL}?action=getAllOrders`);
-      const data = await res.json();
-      return data.orders || [];
-    },
-    async updateOrderStatus(orderId, status) {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'updateStatus', orderId, status })
-      });
-      return await res.json();
-    },
-    async getMenuAndAddons() {
-      try {
-        const res = await fetch(`${API_URL}?action=getMenu`);
-        const data = await res.json();
-        return { menu: data.menu || [], addons: data.addons || [], from: 'api' };
-      } catch {
-        return { menu: [], addons: [], from: 'fallback' };
-      }
-    },
-    async updateMenuItem(itemId, updates) {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'text/plain' },
-        body: JSON.stringify({ action: 'updateMenuItem', itemId, updates })
-      });
-      return await res.json();
-    }
-  };
-
-  // Login Component
-  const Login = ({ onLogin }) => {
-    const [password, setPassword] = React.useState('');
-    const handleSubmit = (e) => {
-      e.preventDefault();
-      if (password === ADMIN_PASSWORD) {
-        localStorage.setItem('admin-auth', 'true');
-        onLogin();
-      } else {
-        alert('密碼錯誤！');
+    const api = {
+      async get(path) {
+        const res = await fetch(`${API_URL}?action=${path}`);
+        return await res.json();
+      },
+      async post(action, data) {
+        const res = await fetch(API_URL, {
+          method: 'POST',
+          body: JSON.stringify({ action, ...data })
+        });
+        return await res.json();
       }
     };
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-50 to-green-100 p-4">
-        <div className="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
-          <h1 className="text-3xl font-bold text-center text-green-800 mb-6">店家管理系統</h1>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <input
-              type="password"
-              placeholder="輸入管理員密碼"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-              required
-            />
-            <button type="submit" className="w-full bg-green-600 text-white font-bold py-3 rounded-lg hover:bg-green-700 transition">
-              登入
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  };
 
-  // Dashboard Layout
-  const Dashboard = () => {
-    const [activeTab, setActiveTab] = React.useState('orders');
-    const [orders, setOrders] = React.useState([]);
-    const [menuData, setMenuData] = React.useState([]);
-    const [loading, setLoading] = React.useState(true);
-
-    const fetchData = async () => {
-      setLoading(true);
-      const [orderData, menuData] = await Promise.all([
-        apiService.fetchOrders(),
-        apiService.getMenuAndAddons()
-      ]);
-      setOrders(orderData);
-      setMenuData(menuData.menu);
-      setLoading(false);
+    const StatusBadge = ({ status }) => {
+      const colors = {
+        '確認中': 'bg-blue-500',
+        '準備中': 'bg-yellow-500',
+        '可以取餐': 'bg-purple-500',
+        '完成': 'bg-green-600'
+      };
+      return <span className={`px-3 py-1 text-white text-sm font-bold rounded-full ${colors[status] || 'bg-gray-500'}`}>{status}</span>;
     };
 
-    React.useEffect(() => { fetchData(); }, []);
+    const AdminApp = () => {
+      const [activeTab, setActiveTab] = useState('orders');
+      const [orders, setOrders] = useState([]);
+      const [menu, setMenu] = useState([]);
+      const [stats, setStats] = useState(null);
+      const [loading, setLoading] = useState(true);
 
-    const handleStatusUpdate = async (orderId, status) => {
-      await apiService.updateOrderStatus(orderId, status);
-      setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
-    };
+      const refreshData = async () => {
+        setLoading(true);
+        const [orderRes, menuRes, statsRes] = await Promise.all([
+          api.get('getAllOrders'),
+          api.get('getMenu'),
+          api.get('getSalesStats')
+        ]);
+        if (orderRes.success) setOrders(orderRes.orders);
+        if (menuRes.success) setMenu([...menuRes.menu, ...menuRes.addons.map(a => ({...a, isAddon: true}))]);
+        if (statsRes.success) setStats(statsRes);
+        setLoading(false);
+      };
 
-    const handlePrint = (order) => {
-      const printWindow = window.open('', '_blank');
-      printWindow.document.write(`
-        <html><head><title>訂單 #${order.id}</title>
-        <style>
-          body { font-family: sans-serif; padding: 20px; }
-          .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 10px; }
-          .info { margin: 10px 0; }
-          .item { margin: 8px 0; }
-          .total { font-weight: bold; font-size: 1.2em; margin-top: 20px; text-align: right; }
-        </style>
-        </head><body>
-        <div class="header"><h2>美味廚房 - 訂單明細</h2></div>
-        <div class="info"><strong>訂單編號：</strong>${order.id}</div>
-        <div class="info"><strong>時間：</strong>${new Date(order.timestamp).toLocaleString()}</div>
-        <div class="info"><strong>類型：</strong>${order.orderType}</div>
-        <div class="info"><strong>顧客：</strong>${order.customerName} (${order.customerPhone}) ${order.tableNumber ? `| 桌號: ${order.tableNumber}` : ''}</div>
-        <hr>
-        ${order.items.map(item => `
-          <div class="item"><strong>${item.item.name} x${item.quantity}</strong> $${item.totalPrice}</div>
-          ${item.selectedDonenesses ? `<div class="item pl-4 text-sm">熟度: ${Object.entries(item.selectedDonenesses).map(([d,q])=>`${d}x${q}`).join(', ')}</div>` : ''}
-          ${item.selectedNotes ? `<div class="item pl-4 text-sm text-blue-600">備註: ${item.selectedNotes}</div>` : ''}
-        `).join('')}
-        <div class="total">總金額：$${order.totalAmount}</div>
-        </body></html>
-      `);
-      printWindow.document.close();
-      printWindow.print();
-    };
+      useEffect(() => { refreshData(); }, []);
 
-    const handleLogout = () => {
-      localStorage.removeItem('admin-auth');
-      window.location.reload();
-    };
+      const updateStatus = async (id, status) => {
+        await api.post('updateStatus', { orderId: id, status });
+        refreshData();
+      };
 
-    return (
-      <div className="min-h-screen bg-gray-50">
-        {/* Header */}
-        <header className="bg-white shadow-md sticky top-0 z-10">
-          <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-green-800">美味廚房管理後台</h1>
-            <button onClick={handleLogout} className="flex items-center gap-2 text-red-600 hover:text-red-800">
-              <LogoutIcon /> 登出
-            </button>
-          </div>
-        </header>
+      const toggleAvailability = async (id, current) => {
+        await api.post('updateMenuItem', { itemId: id, updates: { isAvailable: !current } });
+        refreshData();
+      };
 
-        {/* Tabs */}
-        <div className="bg-white border-b">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex space-x-8 px-4 overflow-x-auto">
-              {[
-                { id: 'orders', label: '訂單管理', icon: <PackageIcon /> },
-                { id: 'stats', label: '銷售統計', icon: <ChartIcon /> },
-                { id: 'menu', label: '菜單管理', icon: <MenuIcon /> },
-              ].map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-2 py-4 px-2 border-b-2 transition-colors ${
-                    activeTab === tab.id ? 'border-green-600 text-green-600' : 'border-transparent text-gray-600 hover:text-green-600'
-                  }`}
-                >
-                  {tab.icon} <span className="font-medium">{tab.label}</span>
+      const printOrder = async (id) => {
+        const res = await api.post('printOrder', { orderId: id });
+        if (res.success) {
+          const win = window.open('', '_blank');
+          win.document.write(res.html);
+          win.document.close();
+          setTimeout(() => win.print(), 500);
+        }
+      };
+
+      if (loading) return <div className="flex justify-center items-center h-screen"><div className="animate-spin rounded-full h-12 w-12 border-t-4 border-green-600"></div></div>;
+
+      return (
+        <div className="min-h-screen bg-gray-100">
+          <header className="bg-white shadow-md p-4">
+            <h1 className="text-2xl font-bold text-green-800">美味廚房 - 店家管理系統</h1>
+          </header>
+
+          <div className="container mx-auto p-4">
+            <div className="flex gap-2 mb-6 flex-wrap">
+              {['orders', 'stats', 'menu'].map(tab => (
+                <button key={tab} onClick={() => setActiveTab(tab)}
+                  className={`px-6 py-2 rounded-lg font-semibold transition ${activeTab === tab ? 'bg-green-600 text-white' : 'bg-white text-gray-700 hover:bg-gray-100'}`}>
+                  {tab === 'orders' ? '訂單管理' : tab === 'stats' ? '銷售統計' : '菜單管理'}
                 </button>
               ))}
+              <button onClick={refreshData} className="ml-auto bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">刷新</button>
             </div>
-          </div>
-        </div>
 
-        {/* Content */}
-        <div className="max-w-7xl mx-auto p-4 md:p-6">
-          {loading ? (
-            <div className="flex justify-center items-center h-64">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-4 border-green-600"></div>
-            </div>
-          ) : (
-            <>
-              {activeTab === 'orders' && <OrdersTab orders={orders} onStatusUpdate={handleStatusUpdate} onPrint={handlePrint} />}
-              {activeTab === 'stats' && <StatsTab orders={orders} />}
-              {activeTab === 'menu' && <MenuTab menuData={menuData} onUpdate={fetchData} />}
-            </>
-          )}
-        </div>
-      </div>
-    );
-  };
-
-  // Orders Tab
-  const OrdersTab = ({ orders, onStatusUpdate, onPrint }) => {
-    const [filter, setFilter] = React.useState('all');
-    const filtered = filter === 'all' ? orders : orders.filter(o => o.status === filter);
-
-    const statusOptions = [
-      { value: '確認中', label: '確認中', color: 'bg-blue-500' },
-      { value: '準備中', label: '準備中', color: 'bg-yellow-500' },
-      { value: '可以取餐', label: '可以取餐', color: 'bg-purple-500' },
-      { value: '完成', label: '完成', color: 'bg-green-600' },
-    ];
-
-    return (
-      <div>
-        <div className="flex flex-wrap gap-2 mb-6">
-          {['all', ...statusOptions.map(s => s.value)].map(status => (
-            <button
-              key={status}
-              onClick={() => setFilter(status === 'all' ? 'all' : status)}
-              className={`px-4 py-2 rounded-lg font-medium transition ${
-                filter === status ? 'bg-green-600 text-white' : 'bg-white text-gray-700 border'
-              }`}
-            >
-              {status === 'all' ? '全部訂單' : status}
-            </button>
-          ))}
-        </div>
-
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {filtered.map(order => (
-            <div key={order.id} className="bg-white rounded-lg shadow p-5 hover:shadow-lg transition">
-              <div className="flex justify-between items-start mb-3">
-                <div>
-                  <h3 className="font-bold text-lg">#{order.id}</h3>
-                  <p className="text-sm text-gray-600">{new Date(order.timestamp).toLocaleTimeString()}</p>
-                </div>
-                <span className={`px-3 py-1 rounded-full text-white text-sm font-bold ${statusOptions.find(s=>s.value===order.status)?.color || 'bg-gray-500'}`}>
-                  {order.status}
-                </span>
-              </div>
-
-              <div className="space-y-1 text-sm mb-3">
-                <p><strong>顧客：</strong>{order.customerName} ({order.customerPhone})</p>
-                <p><strong>類型：</strong>{order.orderType} {order.tableNumber && `| 桌號: ${order.tableNumber}`}</p>
-              </div>
-
-              <div className="border-t pt-2 mb-3">
-                {order.items.slice(0, 2).map((item, i) => (
-                  <p key={i} className="text-sm">{item.item.name} x{item.quantity}</p>
+            {activeTab === 'orders' && (
+              <div className="space-y-4">
+                {orders.map(order => (
+                  <div key={order.id} className="bg-white p-5 rounded-lg shadow">
+                    <div className="flex justify-between items-start mb-3">
+                      <div>
+                        <h3 className="font-bold text-lg">訂單 #{order.id}</h3>
+                        <p className="text-sm text-gray-600">{new Date(order.timestamp).toLocaleString('zh-TW')}</p>
+                        <p className="text-sm">顧客：{order.customerName} ({order.customerPhone}) {order.tableNumber && `| 桌號：${order.tableNumber}`}</p>
+                      </div>
+                      <div className="flex gap-2 items-center">
+                        <StatusBadge status={order.status} />
+                        <button onClick={() => printOrder(order.id)} className="bg-blue-500 text-white px-3 py-1 rounded text-sm hover:bg-blue-600">列印</button>
+                      </div>
+                    </div>
+                    <div className="border-t pt-3 space-y-1 text-sm">
+                      {order.items.map((it, i) => (
+                        <div key={i} className="flex justify-between">
+                          <span>{it.item.name} x{it.quantity}</span>
+                          <span>${it.totalPrice}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex justify-between items-center mt-3 pt-3 border-t">
+                      <span className="font-bold">總計 ${order.totalAmount}</span>
+                      <div className="flex gap-1">
+                        {['確認中','準備中','可以取餐','完成'].map(s => (
+                          <button key={s} onClick={() => updateStatus(order.id, s)}
+                            className={`px-3 py-1 text-xs rounded ${order.status === s ? 'bg-green-600 text-white' : 'bg-gray-200 hover:bg-gray-300'}`}>
+                            {s}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
                 ))}
-                {order.items.length > 2 && <p className="text-xs text-gray-500">...共 {order.items.length} 項</p>}
               </div>
+            )}
 
-              <div className="flex justify-between items-center">
-                <p className="font-bold text-lg">${order.totalAmount}</p>
-                <div className="flex gap-2">
-                  <button onClick={() => onPrint(order)} className="p-2 bg-gray-100 rounded hover:bg-gray-200"><PrinterIcon /></button>
-                  <select
-                    value={order.status}
-                    onChange={e => onStatusUpdate(order.id, e.target.value)}
-                    className="text-sm border rounded px-2 py-1"
-                  >
-                    {statusOptions.map(opt => (
-                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+            {activeTab === 'stats' && stats && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-white p-6 rounded-lg shadow text-center">
+                  <h3 className="text-3xl font-bold text-green-600">${stats.totalRevenue}</h3>
+                  <p className="text-gray-600">今日營業額</p>
+                </div>
+                <div className="bg-white p-6 rounded-lg shadow text-center">
+                  <h3 className="text-3xl font-bold text-blue-600">{stats.orderCount}</h3>
+                  <p className="text-gray-600">今日訂單數</p>
+                </div>
+                <div className="bg-white p-6 rounded-lg shadow">
+                  <h3 className="font-bold mb-2">熱門商品</h3>
+                  <ol className="space-y-1 text-sm">
+                    {stats.topItems.map((it, i) => (
+                      <li key={i} className="flex justify-between">
+                        <span>{i+1}. {it.name}</span>
+                        <span className="font-semibold">{it.quantity} 份</span>
+                      </li>
                     ))}
-                  </select>
+                  </ol>
                 </div>
               </div>
-            </div>
-          ))}
-        </div>
-      </div>
-    );
-  };
+            )}
 
-  // Stats Tab
-  const StatsTab = ({ orders }) => {
-    const today = new Date().toDateString();
-    const todayOrders = orders.filter(o => new Date(o.timestamp).toDateString() === today);
-    const totalToday = todayOrders.reduce((sum, o) => sum + o.totalAmount, 0);
-
-    const itemStats = React.useMemo(() => {
-      const map = {};
-      orders.forEach(o => {
-        o.items.forEach(item => {
-          const key = item.item.name;
-          map[key] = (map[key] || 0) + item.quantity;
-        });
-      });
-      return Object.entries(map)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 10);
-    }, [orders]);
-
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-white p-6 rounded-lg shadow text-center">
-            <p className="text-gray-600">今日營業額</p>
-            <p className="text-3xl font-bold text-green-600">${totalToday}</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow text-center">
-            <p className="text-gray-600">今日訂單數</p>
-            <p className="text-3xl font-bold text-blue-600">{todayOrders.length}</p>
-          </div>
-          <div className="bg-white p-6 rounded-lg shadow text-center">
-            <p className="text-gray-600">平均客單價</p>
-            <p className="text-3xl font-bold text-purple-600">
-              ${todayOrders.length ? Math.round(totalToday / todayOrders.length) : 0}
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-xl font-bold mb-4">熱門餐點排行</h3>
-          <div className="space-y-3">
-            {itemStats.map(([name, qty], i) => (
-              <div key={name} className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <span className="font-bold text-lg text-gray-400">#{i+1}</span>
-                  <span className="font-medium">{name}</span>
-                </div>
-                <span className="font-bold text-green-600">{qty} 份</span>
+            {activeTab === 'menu' && (
+              <div className="space-y-4">
+                {menu.map(item => (
+                  <div key={item.id} className="bg-white p-4 rounded-lg shadow flex justify-between items-center">
+                    <div>
+                      <h4 className="font-semibold">{item.name} {item.weight && `(${item.weight})`}</h4>
+                      <p className="text-sm text-gray-600">${item.price} | {item.isAddon ? item.category : ''}</p>
+                    </div>
+                    <button onClick={() => toggleAvailability(item.id, item.isAvailable)}
+                      className={`px-4 py-2 rounded font-semibold ${item.isAvailable ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`}>
+                      {item.isAvailable ? '上架中' : '已下架'}
+                    </button>
+                  </div>
+                ))}
               </div>
-            ))}
+            )}
           </div>
         </div>
-      </div>
-    );
-  };
-
-  // Menu Management Tab
-  const MenuTab = ({ menuData, onUpdate }) => {
-    const [editing, setEditing] = React.useState(null);
-
-    const handleUpdate = async (item) => {
-      const updates = {
-        isAvailable: item.isAvailable,
-        price: parseInt(item.price)
-      };
-      await apiService.updateMenuItem(item.id, updates);
-      onUpdate();
-      setEditing(null);
+      );
     };
 
-    return (
-      <div className="space-y-6">
-        {menuData.map(category => (
-          <div key={category.title} className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-xl font-bold mb-4 text-green-700">{category.title}</h3>
-            <div className="grid gap-4">
-              {category.items.map(item => (
-                <div key={item.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
-                  <div className="flex-1">
-                    <p className="font-medium">{item.name}</p>
-                    <p className="text-sm text-gray-600">{item.weight}</p>
-                  </div>
-                  {editing === item.id ? (
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="number"
-                        defaultValue={item.price}
-                        className="w-20 p-1 border rounded"
-                        onChange={e => item.price = e.target.value}
-                      />
-                      <label className="flex items-center gap-1">
-                        <input
-                          type="checkbox"
-                          defaultChecked={item.isAvailable}
-                          onChange={e => item.isAvailable = e.target.checked}
-                        />
-                        <span className="text-sm">上架</span>
-                      </label>
-                      <button onClick={() => handleUpdate(item)} className="text-green-600 font-bold">儲存</button>
-                      <button onClick={() => setEditing(null)} className="text-red-600">取消</button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-4">
-                      <span className="font-bold text-lg text-green-600">${item.price}</span>
-                      <span className={`px-3 py-1 rounded-full text-sm ${item.isAvailable ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-                        {item.isAvailable ? '上架中' : '已下架'}
-                      </span>
-                      <button onClick={() => setEditing(item.id)} className="text-blue-600 hover:underline">編輯</button>
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
-      </div>
-    );
-  };
-
-  // Main App
-  const App = () => {
-    const [isAuthenticated, setIsAuthenticated] = React.useState(!!localStorage.getItem('admin-auth'));
-
-    return isAuthenticated ? <Dashboard /> : <Login onLogin={() => setIsAuthenticated(true)} />;
-  };
-
-  const root = ReactDOM.createRoot(document.getElementById('root'));
-  root.render(<App />);
-</script>
-
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(<AdminApp />);
+  </script>
 </body>
 </html>
